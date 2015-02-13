@@ -189,8 +189,6 @@ int main() {
     //g_signal_connect(recv_session_video, "on-new-candidate", G_CALLBACK(got_candidate), send_session_video);
     //g_signal_connect(send_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), recv_session_audio);
     //g_signal_connect(send_session_video, "on-new-candidate", G_CALLBACK(got_candidate), recv_session_video);
-    g_signal_connect(send_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
-    g_signal_connect(send_session_video, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
 
     // VIDEO
     //g_signal_connect(recv_session_video, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
