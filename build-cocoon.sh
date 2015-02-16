@@ -3,6 +3,6 @@ gcc tests/cocoon_client.c openwebrtc-deps-x86_64-linux/lib/libjson-glib-1.0.a op
 
 gcc tests/cocoon_send.c tests/test_utils.c openwebrtc-deps-x86_64-linux/lib/libjson-glib-1.0.a -o cocoon_send -I./out/x86_64-unknown-linux/include/owr -I ~/.openwebrtc/include/glib-2.0/ -I ~/.openwebrtc/lib/glib-2.0/include/ -L ./out/x86_64-unknown-linux/lib -lopenwebrtc
 
-gcc tests/cocoon_receive.c tests/test_utils.c openwebrtc-deps-x86_64-linux/lib/libjson-glib-1.0.a -o cocoon_receive -I./out/x86_64-unknown-linux/include/owr -I ~/.openwebrtc/include/glib-2.0/ -I ~/.openwebrtc/lib/glib-2.0/include/ -L ./out/x86_64-unknown-linux/lib -lopenwebrtc
+gcc tests/cocoon_receive.c tests/test_utils.c tests/cocoon_utils.c openwebrtc-deps-x86_64-linux/lib/libjson-glib-1.0.a -o cocoon_receive -I./out/x86_64-unknown-linux/include/owr -I ~/.openwebrtc/include/glib-2.0/ -I ~/.openwebrtc/lib/glib-2.0/include/ -L ./out/x86_64-unknown-linux/lib -lopenwebrtc
 # Needs
 # export LD_LIBRARY_PATH=$PWD/out/x86_64-unknown-linux/lib
