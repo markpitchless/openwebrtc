@@ -72,8 +72,55 @@ static void got_remote_source(OwrMediaSession *session, OwrMediaSource *source, 
 
 static void got_candidate(OwrMediaSession *session_a, OwrCandidate *candidate, OwrMediaSession *session_b)
 {
-    g_print("got_candidate:");
-    owr_session_add_remote_candidate(OWR_SESSION(session_b), candidate);
+    // Unpack the candidate data
+    gchar *ice_ufrag, *ice_password;
+    OwrCandidateType candidate_type;
+    OwrComponentType component_type;
+    OwrTransportType transport_type;
+    gchar *foundation, *address, *related_address;
+    gint port, priority, related_port;
+    gchar *candidate_type_name, *component_type_name, *transport_type_name;
+    g_object_get(candidate,
+            "ufrag", &ice_ufrag,
+            "password", &ice_password,
+            "type", &candidate_type,
+            "component-type", &component_type,
+            "foundation", &foundation,
+            "transport-type", &transport_type,
+            "address", &address,
+            "port", &port,
+            "priority", &priority,
+            "base-address", &related_address,
+            "base-port", &related_port, NULL);
+
+    // Convert the numbered types to strings
+    switch ( candidate_type )
+    {
+        case OWR_CANDIDATE_TYPE_HOST             : candidate_type_name = "host"; break;
+        case OWR_CANDIDATE_TYPE_SERVER_REFLEXIVE : candidate_type_name = "server_reflexive"; break;
+        case OWR_CANDIDATE_TYPE_PEER_REFLEXIVE   : candidate_type_name = "peer_reflexive"; break;
+        case OWR_CANDIDATE_TYPE_RELAY            : candidate_type_name = "relay"; break;
+        default: candidate_type_name = "unknown"; break;
+    }
+    switch ( component_type )
+    {
+        case OWR_COMPONENT_TYPE_RTP  : component_type_name = "rtp"; break;
+        case OWR_COMPONENT_TYPE_RTCP : component_type_name = "rtcp"; break;
+        default: component_type_name = "unknown"; break;
+    }
+    switch ( transport_type )
+    {
+        case OWR_TRANSPORT_TYPE_UDP          : transport_type_name = "udp"; break;
+        case OWR_TRANSPORT_TYPE_TCP_ACTIVE   : transport_type_name = "tcp_active"; break;
+        case OWR_TRANSPORT_TYPE_TCP_PASSIVE  : transport_type_name = "tcp_passive"; break;
+        case OWR_TRANSPORT_TYPE_TCP_SO       : transport_type_name = "tcp_so"; break;
+        default: transport_type_name = "unknown"; break;
+    }
+    g_print("candidate: type:%s ufrag:%s icepassword:%s component-type:%s foundation:%s transport_type:%i"
+            " address:%s port:%i priority:%i related_address:%s related_port:%i\n",
+            candidate_type_name, ice_ufrag, ice_password, component_type_name, foundation, transport_type,
+            address, port, priority, related_address, related_port);
+    //owr_session_add_remote_candidate(OWR_SESSION(session_b), candidate);
 }
 
 static void got_sources(GList *sources, gpointer user_data)
@@ -189,6 +236,9 @@ int main() {
     //g_signal_connect(recv_session_video, "on-new-candidate", G_CALLBACK(got_candidate), send_session_video);
     //g_signal_connect(send_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), recv_session_audio);
     //g_signal_connect(send_session_video, "on-new-candidate", G_CALLBACK(got_candidate), recv_session_video);
+    // This signal fires when we generate local candidates that should sent to
+    // the other end via the signal channel.
+    g_signal_connect(send_session_video, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
 
     // VIDEO
     //g_signal_connect(recv_session_video, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
