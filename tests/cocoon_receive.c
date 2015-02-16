@@ -150,8 +150,54 @@ static void got_sources(GList *sources, gpointer user_data)
 static gboolean get_candidates_cb(gpointer *user_data)
 {
     // Aks for candidates
-    char* str2 = prompt_line("Enter candidate:\n");
-    g_print("GOT: %s\n", str2);
+    char* line = prompt_line("Enter candidate:\n");
+    //g_print("GOT: %s\n", line);
+
+    // Parse into OwrCandidate
+    OwrCandidate *remote_candidate;
+    OwrCandidateType candidate_type;
+    OwrComponentType component_type;
+    OwrTransportType transport_type;
+    gchar cand_type[100], foundation[100], transport[100], address[100], tcp_type[100], candidate_type_name[100], r_address[100];
+    gint priority, port, r_port;
+
+    sscanf( line, "candidate:%s %u %s %u %s %u typ %s",
+            foundation, &component_type, transport, &priority, address, &port, candidate_type_name);
+
+    if ( strcmp(candidate_type_name, "host") == 0 )  candidate_type = OWR_CANDIDATE_TYPE_HOST;
+    if ( strcmp(candidate_type_name, "srflx") == 0 ) candidate_type = OWR_CANDIDATE_TYPE_SERVER_REFLEXIVE;
+    if ( strcmp(candidate_type_name, "prflx") == 0 ) candidate_type = OWR_CANDIDATE_TYPE_PEER_REFLEXIVE;
+    if ( strcmp(candidate_type_name, "relay") == 0 ) candidate_type = OWR_CANDIDATE_TYPE_RELAY;
+
+    if ( strcmp(transport, "udp") == 0 )
+        transport_type = OWR_TRANSPORT_TYPE_UDP;
+    else
+        transport_type = OWR_TRANSPORT_TYPE_TCP_ACTIVE;
+    if ( transport_type != OWR_TRANSPORT_TYPE_UDP ) { // tcp
+        sscanf( line, "candidate:* * * * * * typ * tcptype %s", tcp_type);
+        if (!g_strcmp0(tcp_type, "active"))
+            transport_type = OWR_TRANSPORT_TYPE_TCP_ACTIVE;
+        else if (!g_strcmp0(tcp_type, "passive"))
+            transport_type = OWR_TRANSPORT_TYPE_TCP_PASSIVE;
+        else
+            transport_type = OWR_TRANSPORT_TYPE_TCP_SO;
+    }
+    if (candidate_type == OWR_CANDIDATE_TYPE_SERVER_REFLEXIVE) {
+        sscanf( line, "candidate:* * * * * * typ * raddr %s rport %u", r_address, &r_port);
+    }
+    g_print("candidate: foundation:%s component-type:%i transport:%s priority:%i address:%s port:%i typ:%s %i\n",
+            foundation, component_type, transport, priority, address, port, candidate_type_name, candidate_type);
+
+    remote_candidate = owr_candidate_new(candidate_type, component_type);
+    g_object_set(remote_candidate, "foundation", foundation, NULL);
+    g_object_set(remote_candidate, "transport-type", transport_type, NULL);
+    g_object_set(remote_candidate, "address", address, NULL);
+    g_object_set(remote_candidate, "port", port, NULL);
+    g_object_set(remote_candidate, "priority", priority, NULL);
+
+    owr_session_add_remote_candidate(OWR_SESSION(recv_session_audio), remote_candidate);
+    owr_session_add_remote_candidate(OWR_SESSION(recv_session_video), remote_candidate);
+
     return TRUE; // keep asking
 }
 
