@@ -15,6 +15,7 @@
 #include "owr_media_session.h"
 #include "owr_transport_agent.h"
 #include "test_utils.h"
+#include "cocoon_utils.h"
 
 static OwrTransportAgent *recv_transport_agent = NULL;
 static OwrMediaSession *recv_session_audio = NULL;
@@ -207,16 +208,19 @@ static void got_sources(GList *sources, gpointer user_data)
         write_dot_file("test_send-got_source-video-renderer", owr_media_renderer_get_dot_data(video_renderer), TRUE);
 }
 
-static gboolean dump_cb(gpointer *user_data)
+static gboolean get_candidates_cb(gpointer *user_data)
 {
-    g_print("Dumping send transport agent pipeline!\n");
+    // Aks for candidates
+    char* line = prompt_line("Enter candidate:\n");
 
-    write_dot_file("test_send-got_source-transport_agent", owr_transport_agent_get_dot_data(send_transport_agent), TRUE);
-    //write_dot_file("test_receive-got_remote_source-transport_agent", owr_transport_agent_get_dot_data(recv_transport_agent), TRUE);
+    OwrCandidate *remote_candidate;
+    remote_candidate = sdp_2_candidate(line);
 
-    return G_SOURCE_REMOVE;
+    owr_session_add_remote_candidate(OWR_SESSION(send_session_audio), remote_candidate);
+    owr_session_add_remote_candidate(OWR_SESSION(send_session_video), remote_candidate);
+
+    return TRUE; // keep asking
 }
-
 
 int main() {
     GMainContext *ctx = g_main_context_default();
@@ -254,6 +258,7 @@ int main() {
     // This signal fires when we generate local candidates that should sent to
     // the other end via the signal channel.
     g_signal_connect(send_session_video, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
+    g_signal_connect(send_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
 
     // VIDEO
     //g_signal_connect(recv_session_video, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
@@ -279,7 +284,7 @@ int main() {
 
     owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO|OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
 
-    g_timeout_add_seconds(5, (GSourceFunc)dump_cb, NULL);
+    g_timeout_add_seconds(1, (GSourceFunc)get_candidates_cb, NULL);
 
     g_main_loop_run(loop);
 
