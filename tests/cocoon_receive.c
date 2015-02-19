@@ -72,8 +72,9 @@ static void got_remote_source(OwrMediaSession *session, OwrMediaSource *source, 
 
 static void got_candidate(OwrMediaSession *session_a, OwrCandidate *candidate, OwrMediaSession *session_b)
 {
-    g_print("got_candidate:");
-    owr_session_add_remote_candidate(OWR_SESSION(session_b), candidate);
+    //g_print("got_candidate:");
+    g_print_candidate(candidate);
+    //owr_session_add_remote_candidate(OWR_SESSION(session_b), candidate);
 }
 
 /*
@@ -234,6 +235,10 @@ int main() {
     //g_signal_connect(recv_session_video, "on-new-candidate", G_CALLBACK(got_candidate), send_session_video);
     //g_signal_connect(send_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), recv_session_audio);
     //g_signal_connect(send_session_video, "on-new-candidate", G_CALLBACK(got_candidate), recv_session_video);
+    // This signal fires when we generate local candidates that should sent to
+    // the other end via the signal channel.
+    g_signal_connect(recv_session_video, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
+    g_signal_connect(recv_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
 
     // VIDEO
     g_signal_connect(recv_session_video, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
