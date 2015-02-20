@@ -86,8 +86,10 @@ void g_print_candidate(OwrCandidate *candidate)
     //        address, port, priority, related_address, related_port);
 
     // Output SDP ICE candidate line.
-    g_print("candidate:%s %i %s %i %s %i typ %s",
-            foundation, component_type, transport, priority, address, port, candidate_type_name);
+    // XXX ufrag and password actually go in different sdp records, but hacked
+    // in here to test.
+    g_print("candidate:%s %i %s %i %s %i ufrag %s passwd %s typ %s",
+            foundation, component_type, transport, priority, address, port, ice_ufrag, ice_password, candidate_type_name);
     if (transport_type != OWR_TRANSPORT_TYPE_UDP) { // tcp
         g_print(" tcptype %s", transport_type_name);
     }
@@ -104,11 +106,12 @@ OwrCandidate* sdp_2_candidate(gchar *line)
     OwrComponentType component_type;
     OwrTransportType transport_type;
     gchar cand_type[100], foundation[100], transport[100], address[100],
-          tcp_type[100], candidate_type_name[100], r_address[100];
+          tcp_type[100], candidate_type_name[100], r_address[100],
+          ice_ufrag[100], ice_password[100];
     gint priority, port, r_port;
 
-    sscanf( line, "candidate:%s %u %s %u %s %u typ %s",
-            foundation, &component_type, transport, &priority, address, &port, candidate_type_name);
+    sscanf( line, "candidate:%s %u %s %u %s %u ufrag %s passwd %s typ %s",
+            foundation, &component_type, transport, &priority, address, &port, ice_ufrag, ice_password, candidate_type_name);
 
     if ( strcmp(candidate_type_name, "host") == 0 )  candidate_type = OWR_CANDIDATE_TYPE_HOST;
     if ( strcmp(candidate_type_name, "srflx") == 0 ) candidate_type = OWR_CANDIDATE_TYPE_SERVER_REFLEXIVE;
@@ -138,6 +141,8 @@ OwrCandidate* sdp_2_candidate(gchar *line)
     g_object_set(remote_candidate, "address", address, NULL);
     g_object_set(remote_candidate, "port", port, NULL);
     g_object_set(remote_candidate, "priority", priority, NULL);
+    g_object_set(remote_candidate, "ufrag", ice_ufrag, NULL);
+    g_object_set(remote_candidate, "password", ice_password, NULL);
 
     g_print("CANDIDATE: foundation:%s component-type:%i transport:%s priority:%i address:%s port:%i typ:%s %i\n", foundation, component_type, transport, priority, address, port, candidate_type_name, candidate_type);
 
