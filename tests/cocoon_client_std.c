@@ -258,14 +258,14 @@ static void send_answer()
     g_object_unref(builder);
     g_object_unref(generator);
 
-    url = g_strdup_printf(SERVER_URL"/ctos/%s/%u/%s", session_id, client_id, peer_id);
-    soup_session = soup_session_new();
-    soup_message = soup_message_new("POST", url);
-    g_free(url);
-    soup_message_set_request(soup_message, "application/json",
-        SOUP_MEMORY_TAKE, json, json_length);
-    soup_session_send_async(soup_session, soup_message, NULL,
-        (GAsyncReadyCallback)answer_sent, NULL);
+    //url = g_strdup_printf(SERVER_URL"/ctos/%s/%u/%s", session_id, client_id, peer_id);
+    //soup_session = soup_session_new();
+    //soup_message = soup_message_new("POST", url);
+    //g_free(url);
+    //soup_message_set_request(soup_message, "application/json",
+    //    SOUP_MEMORY_TAKE, json, json_length);
+    //soup_session_send_async(soup_session, soup_message, NULL,
+    //    (GAsyncReadyCallback)answer_sent, NULL);
 }
 
 static void send_offer()
@@ -295,6 +295,15 @@ static void send_offer()
     json_builder_begin_object(builder);
     json_builder_set_member_name(builder, "type");
     json_builder_add_string_value(builder, "offer");
+
+    json_builder_set_member_name(builder, "sdp");
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "type");
+    json_builder_add_string_value(builder, "offer");
+    json_builder_set_member_name(builder, "sdp");
+    json_builder_add_string_value(builder, "dummy");
+    json_builder_end_object(builder);
+
     json_builder_set_member_name(builder, "sessionDescription");
     json_builder_begin_object(builder);
     json_builder_set_member_name(builder, "mediaDescriptions");
@@ -445,7 +454,8 @@ static void send_offer()
 
     g_print(":\n");
     g_print("event:user-%i\n", client_id);
-    g_print("data:%s\n", json);
+    //g_print("data:%s\n", json);
+    g_print("offer:%s\n", json);
 
     //url = g_strdup_printf(SERVER_URL"/ctos/%s/%u/%s", session_id, client_id, peer_id);
     //soup_session = soup_session_new();
@@ -869,7 +879,9 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
     gsize line_length;
     gboolean peer_joined = GPOINTER_TO_UINT(user_data);
 
+    //GError *error;
     line = g_data_input_stream_read_line_finish_utf8(input_stream, result, &line_length, NULL);
+    //g_print("ERROR:%s\n", error);
     g_print("eventstream_line_read: %s\n", line);
     if (line) {
         if (peer_joined && g_strstr_len(line, MIN(line_length, 5), "data:")) {
@@ -889,11 +901,22 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
         else if (g_strstr_len(line, MIN(line_length, 4), "send")) {
             send_offer();
         }
-        else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 3), "sdp"))
+        // XXX: This makes nasty assumption about the layout of the json
+        else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 3), "sdp")) {
             handle_offer(line + 5, line_length - 5);
-        else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 9), "candidate"))
+        }
+        // Add a new type
+        else if (g_strstr_len(line, MIN(line_length, 6), "offer:")) {
+            handle_offer(line + 6, line_length - 6);
+        }
+        else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 9), "candidate")) {
             handle_remote_candidate(line + 5, line_length - 5);
+        }
         g_free(line);
+    }
+    else {
+        g_print("NO LINE\n");
+        exit(23);
     }
 
     read_eventstream_line(input_stream, GUINT_TO_POINTER(peer_joined));
@@ -916,9 +939,15 @@ static void eventsource_request_sent(SoupSession *soup_session, GAsyncResult *re
     //input_stream = soup_session_send_finish(soup_session, result, NULL);
 
     input_stream = g_unix_input_stream_new(0, FALSE); // STDIN
+    gsize buffer_size;
 
     if (input_stream) {
         data_input_stream = g_data_input_stream_new(input_stream);
+        buffer_size = g_buffered_input_stream_get_buffer_size(G_BUFFERED_INPUT_STREAM(data_input_stream));
+        g_print("Buffer:%i\n", buffer_size);
+        g_buffered_input_stream_set_buffer_size(G_BUFFERED_INPUT_STREAM(data_input_stream), 8192);
+        buffer_size = g_buffered_input_stream_get_buffer_size(G_BUFFERED_INPUT_STREAM(data_input_stream));
+        g_print("Buffer:%i\n", buffer_size);
         read_eventstream_line(data_input_stream, user_data);
     } else
         g_warning("Failed to connect to the server");
@@ -1066,7 +1095,10 @@ gint main(gint argc, gchar **argv)
     main_loop = g_main_loop_new(NULL, FALSE);
     main_context = g_main_context_default();
     owr_init_with_main_context(main_context);
-    owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO | OWR_MEDIA_TYPE_VIDEO,
+    // TODO: Just video for now to keep the line size inside the shell buffer.
+    //owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO | OWR_MEDIA_TYPE_VIDEO,
+    //    (OwrCaptureSourcesCallback)got_local_sources, url);
+    owr_get_capture_sources(OWR_MEDIA_TYPE_VIDEO,
         (OwrCaptureSourcesCallback)got_local_sources, url);
 
     //g_timeout_add_seconds(4, (GSourceFunc)send_offer_cb, NULL);
