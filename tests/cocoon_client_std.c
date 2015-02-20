@@ -873,6 +873,20 @@ static void reset()
         (OwrCaptureSourcesCallback)got_local_sources, NULL);
 }
 
+/* 
+ * TODO: Buffer problems
+ *
+ * The buffer on the GDataInputStream is getting topped out passing the big
+ * JSON strings on the command line. As we use a single line for the entire
+ * message.
+ *
+ * * Split the candidates out to keep the messages smaller.
+ * * Add event:json, that starts reading lines into a string, which finishes
+ *   when we see event:json-end. Then feed that in as the line.
+ * * Use a char based reader to fill our own buffer, probably messy!
+ * * Set the stdin buffer bigger.
+ *
+ */
 static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *result,
     gpointer user_data)
 {
