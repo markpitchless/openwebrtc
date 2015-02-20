@@ -308,6 +308,7 @@ static void send_offer()
         json_builder_set_member_name(builder, "type");
         media_type = g_object_steal_data(media_session, "media-type");
         json_builder_add_string_value(builder, media_type);
+        g_print("send_offer: media_type: %s\n", media_type);
 
         json_builder_set_member_name(builder, "rtcp");
         json_builder_begin_object(builder);
@@ -333,18 +334,23 @@ static void send_offer()
         json_builder_add_int_value(builder, clock_rate);
 
         if (!g_strcmp0(media_type, "audio")) {
+            g_print("send_offer: audio\n");
             json_builder_set_member_name(builder, "channels");
             channels = GPOINTER_TO_UINT(g_object_steal_data(media_session, "channels"));
             json_builder_add_int_value(builder, channels);
-        } else if (!g_strcmp0(media_type, "video")) {
+        }
+        else if (!g_strcmp0(media_type, "video")) {
+            g_print("send_offer: video\n");
             json_builder_set_member_name(builder, "ccmfir");
             ccm_fir = GPOINTER_TO_UINT(g_object_steal_data(media_session, "ccm-fir"));
             json_builder_add_boolean_value(builder, ccm_fir);
             json_builder_set_member_name(builder, "nackpli");
             nack_pli = GPOINTER_TO_UINT(g_object_steal_data(media_session, "nack-pli"));
             json_builder_add_boolean_value(builder, nack_pli);
-        } else
+        }
+        else {
             g_warn_if_reached();
+        }
 
         json_builder_end_object(builder);
         json_builder_end_array(builder); /* payloads */
@@ -431,7 +437,8 @@ static void send_offer()
     json_builder_end_object(builder); /* sessionDescription */
     json_builder_end_object(builder); /* root */
 
-    json_generator_set_pretty(generator, TRUE);
+    //json_generator_set_pretty(generator, TRUE);
+    json_generator_set_pretty(generator, FALSE);
     root = json_builder_get_root(builder);
     json_generator_set_root(generator, root);
     json = json_generator_to_data(generator, &json_length);
@@ -439,7 +446,9 @@ static void send_offer()
     g_object_unref(builder);
     g_object_unref(generator);
 
-    g_print("%s\n", json);
+    g_print(":\n");
+    g_print("event:user-%i\n", client_id);
+    g_print("data:%s\n", json);
 
     //url = g_strdup_printf(SERVER_URL"/ctos/%s/%u/%s", session_id, client_id, peer_id);
     //soup_session = soup_session_new();
@@ -863,12 +872,18 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
             g_free(peer_id);
             peer_id = g_strndup(line + 5, line_length - 5);
             g_message("Peer joined: %s", peer_id);
-        } else if (g_strstr_len(line, MIN(line_length, 11), "event:leave")) {
+        }
+        else if (g_strstr_len(line, MIN(line_length, 11), "event:leave")) {
             g_message("Peer left");
             peer_id = 0;
             reset();
-        } else if (g_strstr_len(line, MIN(line_length, 10), "event:join"))
+        }
+        else if (g_strstr_len(line, MIN(line_length, 10), "event:join")) {
             peer_joined = TRUE;
+        }
+        else if (g_strstr_len(line, MIN(line_length, 4), "send")) {
+            send_offer();
+        }
         else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 3), "sdp"))
             handle_offer(line + 5, line_length - 5);
         else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 9), "candidate"))
@@ -917,6 +932,86 @@ static void send_eventsource_request(const gchar *url)
     eventsource_request_sent(NULL, NULL, NULL);
 }
 
+static void got_sources(GList *sources, gpointer user_data)
+{
+    g_print("got_sources\n");
+    OwrMediaSource *source = NULL;
+    static gboolean have_video = FALSE, have_audio = FALSE;
+    OwrMediaRenderer *video_renderer = NULL;
+    GList *media_sessions;
+
+    g_assert(sources);
+
+    while(sources && (source = sources->data)) {
+        OwrMediaType media_type;
+        OwrSourceType source_type;
+        OwrMediaSession *media_session;
+        GObject *session;
+
+        g_assert(OWR_IS_MEDIA_SOURCE(source));
+
+        g_object_get(source, "type", &source_type, "media-type", &media_type, NULL);
+
+        media_session = owr_media_session_new(TRUE);
+        session = G_OBJECT(media_session);
+
+        if (media_type == OWR_MEDIA_TYPE_VIDEO) {
+            g_object_set_data(session, "media-type", "video");
+        }
+        else if (media_type == OWR_MEDIA_TYPE_AUDIO) {
+            g_object_set_data(session, "media-type", "audio");
+        }
+
+        if (!have_video && media_type == OWR_MEDIA_TYPE_VIDEO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
+            g_print("VIDEO\n");
+            OwrVideoRenderer *renderer;
+            OwrPayload *payload;
+
+            have_video = TRUE;
+
+            payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
+            g_object_set(payload, "width", 1280, "height", 720, "framerate", 30.0, NULL);
+            g_object_set(payload, "rtx-payload-type", 123, NULL);
+
+            owr_media_session_set_send_payload(media_session, payload);
+
+            owr_media_session_set_send_source(media_session, source);
+
+            media_sessions = g_object_get_data(G_OBJECT(transport_agent), "media-sessions");
+            media_sessions = g_list_append(media_sessions, media_session);
+            g_object_set_data(G_OBJECT(transport_agent), "media-sessions", media_sessions);
+            owr_transport_agent_add_session(transport_agent, OWR_SESSION(media_session));
+
+            //g_print("Displaying self-view\n");
+            //renderer = owr_video_renderer_new(NULL);
+            //g_assert(renderer);
+            //g_object_set(renderer, "width", 1280, "height", 720, "max-framerate", 30.0, NULL);
+            //owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
+            //video_renderer = OWR_MEDIA_RENDERER(renderer);
+        } else if (!have_audio && media_type == OWR_MEDIA_TYPE_AUDIO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
+            g_print("AUDIO\n");
+            OwrPayload *payload;
+
+            have_audio = TRUE;
+
+            payload = owr_audio_payload_new(OWR_CODEC_TYPE_OPUS, 100, 48000, 1);
+            owr_media_session_set_send_payload(media_session, payload);
+
+            owr_media_session_set_send_source(media_session, source);
+
+            media_sessions = g_object_get_data(G_OBJECT(transport_agent), "media-sessions");
+            media_sessions = g_list_append(media_sessions, media_session);
+            g_object_set_data(G_OBJECT(transport_agent), "media-sessions", media_sessions);
+            owr_transport_agent_add_session(transport_agent, OWR_SESSION(media_session));
+        }
+
+        if (have_video && have_audio)
+            break;
+
+        sources = sources->next;
+    }
+}
+
 static void got_local_sources(GList *sources, gchar *url)
 {
     g_print("got_local_sources: %s\n", url);
@@ -924,11 +1019,13 @@ static void got_local_sources(GList *sources, gchar *url)
     transport_agent = owr_transport_agent_new(FALSE);
     owr_transport_agent_add_helper_server(transport_agent, OWR_HELPER_SERVER_TYPE_STUN,
         "stun.services.mozilla.com", 3478, NULL, NULL);
+    got_sources(sources, NULL);
     if (url) {
         send_eventsource_request(url);
         g_free(url);
     }
 }
+
 
 static gboolean send_offer_cb(gpointer *user_data)
 {
@@ -959,7 +1056,7 @@ gint main(gint argc, gchar **argv)
     owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO | OWR_MEDIA_TYPE_VIDEO,
         (OwrCaptureSourcesCallback)got_local_sources, url);
 
-    g_timeout_add_seconds(4, (GSourceFunc)send_offer_cb, NULL);
+    //g_timeout_add_seconds(4, (GSourceFunc)send_offer_cb, NULL);
 
     g_main_loop_run(main_loop);
     return 0;
