@@ -893,7 +893,10 @@ static void eventsource_request_sent(SoupSession *soup_session, GAsyncResult *re
     GInputStream *input_stream;
     GDataInputStream *data_input_stream;
 
-    input_stream = soup_session_send_finish(soup_session, result, NULL);
+    //input_stream = soup_session_send_finish(soup_session, result, NULL);
+
+    input_stream = g_unix_input_stream_new(0, FALSE); // STDIN
+
     if (input_stream) {
         data_input_stream = g_data_input_stream_new(input_stream);
         read_eventstream_line(data_input_stream, user_data);
@@ -904,7 +907,6 @@ static void eventsource_request_sent(SoupSession *soup_session, GAsyncResult *re
 static void send_eventsource_request(const gchar *url)
 {
     g_print("send_eventsource_request: %s\n", url);
-    // TODO: Set up read of stdin
     //SoupSession *soup_session;
     //SoupMessage *soup_message;
 
@@ -912,6 +914,7 @@ static void send_eventsource_request(const gchar *url)
     //soup_message = soup_message_new("GET", url);
     //soup_session_send_async(soup_session, soup_message, NULL,
     //    (GAsyncReadyCallback)eventsource_request_sent, NULL);
+    eventsource_request_sent(NULL, NULL, NULL);
 }
 
 static void got_local_sources(GList *sources, gchar *url)
