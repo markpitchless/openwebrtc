@@ -249,12 +249,13 @@ static void send_answer()
     json_builder_end_object(builder); /* sessionDescription */
     json_builder_end_object(builder); /* root */
 
-    json_generator_set_pretty(generator, TRUE);
+    //json_generator_set_pretty(generator, TRUE);
+    json_generator_set_pretty(generator, FALSE);
     root = json_builder_get_root(builder);
     json_generator_set_root(generator, root);
     json = json_generator_to_data(generator, &json_length);
     json_node_free(root);
-    g_print("send_answer: %s\n", json);
+    g_print("answer:%s\n", json);
     g_object_unref(builder);
     g_object_unref(generator);
 
