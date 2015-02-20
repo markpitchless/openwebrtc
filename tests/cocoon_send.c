@@ -155,10 +155,19 @@ static gboolean get_candidates_cb(gpointer *user_data)
     OwrCandidate *remote_candidate;
     remote_candidate = sdp_2_candidate(line);
 
-    owr_session_add_remote_candidate(OWR_SESSION(send_session_audio), remote_candidate);
+//    owr_session_add_remote_candidate(OWR_SESSION(send_session_audio), remote_candidate);
     owr_session_add_remote_candidate(OWR_SESSION(send_session_video), remote_candidate);
 
     return TRUE; // keep asking
+}
+
+static void candidate_gathering_done(GObject *media_session, gpointer user_data)
+{
+    g_print("candidate_gathering_done:\n");
+    g_return_if_fail(!user_data);
+    g_object_set_data(media_session, "gathering-done", GUINT_TO_POINTER(1));
+    //if (can_send_answer())
+    //    send_answer();
 }
 
 int main() {
@@ -186,7 +195,7 @@ int main() {
 
     //recv_session_audio = owr_media_session_new(FALSE);
     //recv_session_video = owr_media_session_new(FALSE);
-    send_session_audio = owr_media_session_new(TRUE);
+//    send_session_audio = owr_media_session_new(TRUE);
     send_session_video = owr_media_session_new(TRUE);
 
     // XXX
@@ -194,10 +203,12 @@ int main() {
     //g_signal_connect(recv_session_video, "on-new-candidate", G_CALLBACK(got_candidate), send_session_video);
     //g_signal_connect(send_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), recv_session_audio);
     //g_signal_connect(send_session_video, "on-new-candidate", G_CALLBACK(got_candidate), recv_session_video);
+
     // This signal fires when we generate local candidates that should sent to
     // the other end via the signal channel.
     g_signal_connect(send_session_video, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
-    g_signal_connect(send_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
+    g_signal_connect(send_session_video, "on-candidate-gathering-done", G_CALLBACK(candidate_gathering_done), NULL);
+//    g_signal_connect(send_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
 
     // VIDEO
     //g_signal_connect(recv_session_video, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
@@ -221,7 +232,8 @@ int main() {
 
     /* PREPARE FOR SENDING */
 
-    owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO|OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
+//    owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO|OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
+    owr_get_capture_sources(OWR_MEDIA_TYPE_VIDEO, got_sources, NULL);
 
     g_timeout_add_seconds(1, (GSourceFunc)get_candidates_cb, NULL);
 

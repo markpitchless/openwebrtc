@@ -156,10 +156,19 @@ static gboolean get_candidates_cb(gpointer *user_data)
     OwrCandidate *remote_candidate;
     remote_candidate = sdp_2_candidate(line);
 
-    owr_session_add_remote_candidate(OWR_SESSION(recv_session_audio), remote_candidate);
+//    owr_session_add_remote_candidate(OWR_SESSION(recv_session_audio), remote_candidate);
     owr_session_add_remote_candidate(OWR_SESSION(recv_session_video), remote_candidate);
 
     return TRUE; // keep asking
+}
+
+static void candidate_gathering_done(GObject *media_session, gpointer user_data)
+{
+    g_print("candidate_gathering_done:\n");
+    g_return_if_fail(!user_data);
+    g_object_set_data(media_session, "gathering-done", GUINT_TO_POINTER(1));
+    //if (can_send_answer())
+    //    send_answer();
 }
 
 int main() {
@@ -185,7 +194,7 @@ int main() {
     //owr_transport_agent_set_local_port_range(send_transport_agent, 5000, 5999);
     //owr_transport_agent_add_local_address(send_transport_agent, "127.0.0.1");
 
-    recv_session_audio = owr_media_session_new(FALSE);
+//    recv_session_audio = owr_media_session_new(FALSE);
     recv_session_video = owr_media_session_new(FALSE);
     //send_session_audio = owr_media_session_new(TRUE);
     //send_session_video = owr_media_session_new(TRUE);
@@ -195,10 +204,12 @@ int main() {
     //g_signal_connect(recv_session_video, "on-new-candidate", G_CALLBACK(got_candidate), send_session_video);
     //g_signal_connect(send_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), recv_session_audio);
     //g_signal_connect(send_session_video, "on-new-candidate", G_CALLBACK(got_candidate), recv_session_video);
+
     // This signal fires when we generate local candidates that should sent to
     // the other end via the signal channel.
     g_signal_connect(recv_session_video, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
-    g_signal_connect(recv_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
+//    g_signal_connect(recv_session_audio, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
+    g_signal_connect(recv_session_video, "on-candidate-gathering-done", G_CALLBACK(candidate_gathering_done), NULL);
 
     // VIDEO
     g_signal_connect(recv_session_video, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
@@ -212,12 +223,12 @@ int main() {
 
 
     // AUDIO
-    g_signal_connect(recv_session_audio, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
-
-    receive_payload = owr_audio_payload_new(OWR_CODEC_TYPE_OPUS, 100, 48000, 1);
-    owr_media_session_add_receive_payload(recv_session_audio, receive_payload);
-
-    owr_transport_agent_add_session(recv_transport_agent, OWR_SESSION(recv_session_audio));
+//    g_signal_connect(recv_session_audio, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
+//
+//    receive_payload = owr_audio_payload_new(OWR_CODEC_TYPE_OPUS, 100, 48000, 1);
+//    owr_media_session_add_receive_payload(recv_session_audio, receive_payload);
+//
+//    owr_transport_agent_add_session(recv_transport_agent, OWR_SESSION(recv_session_audio));
 
     /* PREPARE FOR SENDING */
 
