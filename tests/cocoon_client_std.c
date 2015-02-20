@@ -308,7 +308,6 @@ static void send_offer()
         json_builder_set_member_name(builder, "type");
         media_type = g_object_steal_data(media_session, "media-type");
         json_builder_add_string_value(builder, media_type);
-        g_print("send_offer: media_type: %s\n", media_type);
 
         json_builder_set_member_name(builder, "rtcp");
         json_builder_begin_object(builder);
@@ -334,13 +333,11 @@ static void send_offer()
         json_builder_add_int_value(builder, clock_rate);
 
         if (!g_strcmp0(media_type, "audio")) {
-            g_print("send_offer: audio\n");
             json_builder_set_member_name(builder, "channels");
             channels = GPOINTER_TO_UINT(g_object_steal_data(media_session, "channels"));
             json_builder_add_int_value(builder, channels);
         }
         else if (!g_strcmp0(media_type, "video")) {
-            g_print("send_offer: video\n");
             json_builder_set_member_name(builder, "ccmfir");
             ccm_fir = GPOINTER_TO_UINT(g_object_steal_data(media_session, "ccm-fir"));
             json_builder_add_boolean_value(builder, ccm_fir);
@@ -956,11 +953,19 @@ static void got_sources(GList *sources, gpointer user_data)
         session = G_OBJECT(media_session);
 
         if (media_type == OWR_MEDIA_TYPE_VIDEO) {
-            g_object_set_data(session, "media-type", "video");
+            g_object_set_data(session, "media-type", g_strdup("video"));
         }
         else if (media_type == OWR_MEDIA_TYPE_AUDIO) {
-            g_object_set_data(session, "media-type", "audio");
+            g_object_set_data(session, "media-type", g_strdup("audio"));
         }
+
+        //g_signal_connect(media_session, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
+        g_signal_connect(media_session, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
+        // TODO:
+        //g_signal_connect(media_session, "on-candidate-gathering-done",
+        //    G_CALLBACK(candidate_gathering_done), NULL);
+        g_signal_connect(media_session, "notify::dtls-certificate",
+            G_CALLBACK(got_dtls_certificate), NULL);
 
         if (!have_video && media_type == OWR_MEDIA_TYPE_VIDEO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
             g_print("VIDEO\n");
@@ -972,6 +977,7 @@ static void got_sources(GList *sources, gpointer user_data)
             payload = owr_video_payload_new(OWR_CODEC_TYPE_VP8, 103, 90000, TRUE, FALSE);
             g_object_set(payload, "width", 1280, "height", 720, "framerate", 30.0, NULL);
             g_object_set(payload, "rtx-payload-type", 123, NULL);
+            g_object_set_data(session, "encoding-name", g_strdup("VP8"));
 
             owr_media_session_set_send_payload(media_session, payload);
 
