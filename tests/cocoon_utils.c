@@ -144,7 +144,8 @@ OwrCandidate* sdp_2_candidate(gchar *line)
     g_object_set(remote_candidate, "ufrag", ice_ufrag, NULL);
     g_object_set(remote_candidate, "password", ice_password, NULL);
 
-    g_print("CANDIDATE: foundation:%s component-type:%i transport:%s priority:%i address:%s port:%i typ:%s %i\n", foundation, component_type, transport, priority, address, port, candidate_type_name, candidate_type);
+    g_print("CANDIDATE:");
+    g_print_candidate(remote_candidate);
 
     return remote_candidate;
 }
