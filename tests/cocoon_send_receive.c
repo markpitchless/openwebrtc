@@ -41,6 +41,7 @@
 #include "owr_media_session.h"
 #include "owr_transport_agent.h"
 #include "test_utils.h"
+#include "cocoon_utils.h"
 
 static OwrTransportAgent *recv_transport_agent = NULL;
 static OwrMediaSession *recv_session_audio = NULL;
@@ -247,6 +248,7 @@ int main() {
 
     g_timeout_add_seconds(5, (GSourceFunc)dump_cb, NULL);
 
+    g_print("Starting Loop...");
     g_main_loop_run(loop);
 
     return 0;
