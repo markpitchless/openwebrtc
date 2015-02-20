@@ -459,7 +459,7 @@ static void send_offer()
 
 static void got_candidate(GObject *media_session, OwrCandidate *candidate, gpointer user_data)
 {
-    g_print("got_candidate:\n");
+    //g_print("got_candidate:\n");
     GList *local_candidates;
     g_return_if_fail(!user_data);
 
@@ -475,6 +475,14 @@ static void candidate_gathering_done(GObject *media_session, gpointer user_data)
     g_object_set_data(media_session, "gathering-done", GUINT_TO_POINTER(1));
     if (can_send_answer())
         send_answer();
+}
+
+static void local_candidate_gathering_done(GObject *media_session, gpointer user_data)
+{
+    g_print("local_candidate_gathering_done:\n");
+    g_return_if_fail(!user_data);
+    g_object_set_data(media_session, "gathering-done", GUINT_TO_POINTER(1));
+    // TODO: Is this where to hook can send offer?
 }
 
 static void got_dtls_certificate(GObject *media_session, GParamSpec *pspec, gpointer user_data)
@@ -961,9 +969,8 @@ static void got_sources(GList *sources, gpointer user_data)
 
         //g_signal_connect(media_session, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
         g_signal_connect(media_session, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
-        // TODO:
-        //g_signal_connect(media_session, "on-candidate-gathering-done",
-        //    G_CALLBACK(candidate_gathering_done), NULL);
+        g_signal_connect(media_session, "on-candidate-gathering-done",
+            G_CALLBACK(local_candidate_gathering_done), NULL);
         g_signal_connect(media_session, "notify::dtls-certificate",
             G_CALLBACK(got_dtls_certificate), NULL);
 
