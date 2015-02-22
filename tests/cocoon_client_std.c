@@ -468,7 +468,7 @@ static void send_offer()
     //    (GAsyncReadyCallback)answer_sent, NULL);
 }
 
-static void send_candidate(OwrCandidate *candidate)
+static void send_candidate(GObject *media_session, OwrCandidate *candidate)
 {
     //g_print("send_candidate:\n");
     JsonBuilder *builder;
@@ -476,6 +476,12 @@ static void send_candidate(OwrCandidate *candidate)
     JsonNode *root;
     gchar *json;
     gsize json_length;
+
+    //gchar *media_type;
+    //media_type = g_object_steal_data(media_session, "media-type");
+    //OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
+    //g_object_get(media_session, "media-type", &media_type, NULL);
+    OwrMediaType media_type = OWR_MEDIA_TYPE_VIDEO;
 
     builder = json_builder_new();
     generator = json_generator_new();
@@ -486,7 +492,15 @@ static void send_candidate(OwrCandidate *candidate)
     json_builder_set_member_name(builder, "sdpMLineIndex");
     json_builder_add_int_value(builder, 0); // TODO
     json_builder_set_member_name(builder, "sdpMid");
-    json_builder_add_string_value(builder, ""); // TODO video or string
+    if (media_type == OWR_MEDIA_TYPE_VIDEO) {
+        json_builder_add_string_value(builder, "video");
+    }
+    else if (media_type == OWR_MEDIA_TYPE_AUDIO) {
+        json_builder_add_string_value(builder, "audio");
+    }
+    else {
+        json_builder_add_string_value(builder, "unknown");
+    }
     // candidate: contains a sdp serialized version. TODO: Using dummy for now.
     json_builder_set_member_name(builder, "candidate");
     json_builder_add_string_value(builder, "sdp"); // TODO video or string
@@ -551,13 +565,15 @@ static void send_candidate(OwrCandidate *candidate)
 static void got_candidate(GObject *media_session, OwrCandidate *candidate, gpointer user_data)
 {
     //g_print("got_candidate:\n");
-    send_candidate(candidate);
     GList *local_candidates;
     g_return_if_fail(!user_data);
+
+    send_candidate(media_session, candidate);
 
     local_candidates = g_object_get_data(media_session, "local-candidates");
     local_candidates = g_list_append(local_candidates, candidate);
     g_object_set_data(media_session, "local-candidates", local_candidates);
+
 }
 
 static void candidate_gathering_done(GObject *media_session, gpointer user_data)
