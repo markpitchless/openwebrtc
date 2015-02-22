@@ -752,6 +752,8 @@ static void handle_offer(gchar *message, gsize message_length)
     reader = json_reader_new(json_parser_get_root(parser));
     json_reader_read_member(reader, "sessionDescription");
     json_reader_read_member(reader, "mediaDescriptions");
+
+    // For each of the mediaDescriptions in the JSON create a OWRMediaSession
     number_of_media_descriptions = json_reader_count_elements(reader);
     for (i = 0; i < number_of_media_descriptions; i++) {
         json_reader_read_element(reader, i);
@@ -770,6 +772,8 @@ static void handle_offer(gchar *message, gsize message_length)
         json_reader_end_member(reader);
         json_reader_end_member(reader);
 
+        // Create OwrPayload structs for each payload in the media session.
+        // // Each payload generates a send_payload and receive_payload
         json_reader_read_member(reader, "payloads");
         number_of_payloads = json_reader_count_elements(reader);
         codec_type = OWR_CODEC_TYPE_NONE;
@@ -831,6 +835,7 @@ static void handle_offer(gchar *message, gsize message_length)
             } else
                 g_warn_if_reached();
 
+            // // If we get a good pair then add them to the media_session.
             if (send_payload && receive_payload) {
                 g_object_set_data(session, "encoding-name", g_strdup(encoding_name));
                 g_object_set_data(session, "payload-type", GUINT_TO_POINTER(payload_type));
@@ -885,6 +890,8 @@ static void handle_offer(gchar *message, gsize message_length)
         g_signal_connect(media_session, "notify::dtls-certificate",
             G_CALLBACK(got_dtls_certificate), NULL);
 
+        // Search the local sources for the media-type, if we get a match then
+        // link up the sessions.
         for (list_item = local_sources; list_item; list_item = list_item->next) {
             source = OWR_MEDIA_SOURCE(list_item->data);
             g_object_get(source, "media-type", &source_media_type, NULL);
