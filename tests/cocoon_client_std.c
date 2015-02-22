@@ -28,6 +28,11 @@ static guint client_id;
 static gchar *candidate_types[] = { "host", "srflx", "relay", NULL };
 static gchar *tcp_types[] = { "", "active", "passive", "so", NULL };
 
+// Include all the ICE candidates in the offer and answer JSON. Could also be
+// sent as seperate messages down the channel
+gboolean candidates_in_offer = TRUE;
+gboolean candidates_in_answer = TRUE;
+
 static void read_eventstream_line(GDataInputStream *input_stream, gpointer user_data);
 static void got_local_sources(GList *sources, gchar *url);
 
@@ -178,49 +183,51 @@ static void send_answer()
         json_builder_add_string_value(builder, ice_password);
         json_builder_set_member_name(builder, "candidates");
         json_builder_begin_array(builder);
-        for (list_item = candidates; list_item; list_item = list_item->next) {
-            OwrCandidateType candidate_type;
-            OwrComponentType component_type;
-            OwrTransportType transport_type;
-            gchar *foundation, *address, *related_address;
-            gint port, priority, related_port;
-            candidate = OWR_CANDIDATE(list_item->data);
-            g_object_get(candidate, "type", &candidate_type, "component-type", &component_type,
-                "foundation", &foundation, "transport-type", &transport_type, "address", &address,
-                "port", &port, "priority", &priority, "base-address", &related_address,
-                "base-port", &related_port, NULL);
-            json_builder_begin_object(builder);
-            json_builder_set_member_name(builder, "foundation");
-            json_builder_add_string_value(builder, foundation);
-            json_builder_set_member_name(builder, "componentId");
-            json_builder_add_int_value(builder, component_type);
-            json_builder_set_member_name(builder, "transport");
-            if (transport_type == OWR_TRANSPORT_TYPE_UDP)
-                json_builder_add_string_value(builder, "UDP");
-            else
-                json_builder_add_string_value(builder, "TCP");
-            json_builder_set_member_name(builder, "priority");
-            json_builder_add_int_value(builder, priority);
-            json_builder_set_member_name(builder, "address");
-            json_builder_add_string_value(builder, address);
-            json_builder_set_member_name(builder, "port");
-            json_builder_add_int_value(builder, port);
-            json_builder_set_member_name(builder, "type");
-            json_builder_add_string_value(builder, candidate_types[candidate_type]);
-            if (candidate_type != OWR_CANDIDATE_TYPE_HOST) {
-                json_builder_set_member_name(builder, "relatedAddress");
-                json_builder_add_string_value(builder, related_address);
-                json_builder_set_member_name(builder, "relatedPort");
-                json_builder_add_int_value(builder, related_port);
+        if (candidates_in_answer) {
+            for (list_item = candidates; list_item; list_item = list_item->next) {
+                OwrCandidateType candidate_type;
+                OwrComponentType component_type;
+                OwrTransportType transport_type;
+                gchar *foundation, *address, *related_address;
+                gint port, priority, related_port;
+                candidate = OWR_CANDIDATE(list_item->data);
+                g_object_get(candidate, "type", &candidate_type, "component-type", &component_type,
+                    "foundation", &foundation, "transport-type", &transport_type, "address", &address,
+                    "port", &port, "priority", &priority, "base-address", &related_address,
+                    "base-port", &related_port, NULL);
+                json_builder_begin_object(builder);
+                json_builder_set_member_name(builder, "foundation");
+                json_builder_add_string_value(builder, foundation);
+                json_builder_set_member_name(builder, "componentId");
+                json_builder_add_int_value(builder, component_type);
+                json_builder_set_member_name(builder, "transport");
+                if (transport_type == OWR_TRANSPORT_TYPE_UDP)
+                    json_builder_add_string_value(builder, "UDP");
+                else
+                    json_builder_add_string_value(builder, "TCP");
+                json_builder_set_member_name(builder, "priority");
+                json_builder_add_int_value(builder, priority);
+                json_builder_set_member_name(builder, "address");
+                json_builder_add_string_value(builder, address);
+                json_builder_set_member_name(builder, "port");
+                json_builder_add_int_value(builder, port);
+                json_builder_set_member_name(builder, "type");
+                json_builder_add_string_value(builder, candidate_types[candidate_type]);
+                if (candidate_type != OWR_CANDIDATE_TYPE_HOST) {
+                    json_builder_set_member_name(builder, "relatedAddress");
+                    json_builder_add_string_value(builder, related_address);
+                    json_builder_set_member_name(builder, "relatedPort");
+                    json_builder_add_int_value(builder, related_port);
+                }
+                if (transport_type != OWR_TRANSPORT_TYPE_UDP) {
+                    json_builder_set_member_name(builder, "tcpType");
+                    json_builder_add_string_value(builder, tcp_types[transport_type]);
+                }
+                json_builder_end_object(builder);
+                g_free(foundation);
+                g_free(address);
+                g_free(related_address);
             }
-            if (transport_type != OWR_TRANSPORT_TYPE_UDP) {
-                json_builder_set_member_name(builder, "tcpType");
-                json_builder_add_string_value(builder, tcp_types[transport_type]);
-            }
-            json_builder_end_object(builder);
-            g_free(foundation);
-            g_free(address);
-            g_free(related_address);
         }
         g_list_free(candidates);
         json_builder_end_array(builder); /* candidates */
@@ -373,53 +380,55 @@ static void send_offer()
         json_builder_add_string_value(builder, ice_password);
         json_builder_set_member_name(builder, "candidates");
         json_builder_begin_array(builder);
-        for (list_item = candidates; list_item; list_item = list_item->next) {
-            OwrCandidateType candidate_type;
-            OwrComponentType component_type;
-            OwrTransportType transport_type;
-            gchar *foundation, *address, *related_address;
-            gint port, priority, related_port;
-            candidate = OWR_CANDIDATE(list_item->data);
-            g_object_get(candidate, "type", &candidate_type, "component-type", &component_type,
-                "foundation", &foundation, "transport-type", &transport_type, "address", &address,
-                "port", &port, "priority", &priority, "base-address", &related_address,
-                "base-port", &related_port, NULL);
-            json_builder_begin_object(builder);
-            json_builder_set_member_name(builder, "foundation");
-            json_builder_add_string_value(builder, foundation);
-            json_builder_set_member_name(builder, "componentId");
-            json_builder_add_int_value(builder, component_type);
-            json_builder_set_member_name(builder, "transport");
-            if (transport_type == OWR_TRANSPORT_TYPE_UDP)
-                json_builder_add_string_value(builder, "UDP");
-            else
-                json_builder_add_string_value(builder, "TCP");
-            json_builder_set_member_name(builder, "priority");
-            json_builder_add_int_value(builder, priority);
-            json_builder_set_member_name(builder, "address");
-            json_builder_add_string_value(builder, address);
-            json_builder_set_member_name(builder, "port");
-            json_builder_add_int_value(builder, port);
-            json_builder_set_member_name(builder, "type");
-            json_builder_add_string_value(builder, candidate_types[candidate_type]);
-            if (candidate_type != OWR_CANDIDATE_TYPE_HOST) {
-                json_builder_set_member_name(builder, "relatedAddress");
-                json_builder_add_string_value(builder, related_address);
-                json_builder_set_member_name(builder, "relatedPort");
-                json_builder_add_int_value(builder, related_port);
+        if (candidates_in_offer) {
+            for (list_item = candidates; list_item; list_item = list_item->next) {
+                OwrCandidateType candidate_type;
+                OwrComponentType component_type;
+                OwrTransportType transport_type;
+                gchar *foundation, *address, *related_address;
+                gint port, priority, related_port;
+                candidate = OWR_CANDIDATE(list_item->data);
+                g_object_get(candidate, "type", &candidate_type, "component-type", &component_type,
+                    "foundation", &foundation, "transport-type", &transport_type, "address", &address,
+                    "port", &port, "priority", &priority, "base-address", &related_address,
+                    "base-port", &related_port, NULL);
+                json_builder_begin_object(builder);
+                json_builder_set_member_name(builder, "foundation");
+                json_builder_add_string_value(builder, foundation);
+                json_builder_set_member_name(builder, "componentId");
+                json_builder_add_int_value(builder, component_type);
+                json_builder_set_member_name(builder, "transport");
+                if (transport_type == OWR_TRANSPORT_TYPE_UDP)
+                    json_builder_add_string_value(builder, "UDP");
+                else
+                    json_builder_add_string_value(builder, "TCP");
+                json_builder_set_member_name(builder, "priority");
+                json_builder_add_int_value(builder, priority);
+                json_builder_set_member_name(builder, "address");
+                json_builder_add_string_value(builder, address);
+                json_builder_set_member_name(builder, "port");
+                json_builder_add_int_value(builder, port);
+                json_builder_set_member_name(builder, "type");
+                json_builder_add_string_value(builder, candidate_types[candidate_type]);
+                if (candidate_type != OWR_CANDIDATE_TYPE_HOST) {
+                    json_builder_set_member_name(builder, "relatedAddress");
+                    json_builder_add_string_value(builder, related_address);
+                    json_builder_set_member_name(builder, "relatedPort");
+                    json_builder_add_int_value(builder, related_port);
+                }
+                if (transport_type != OWR_TRANSPORT_TYPE_UDP) {
+                    json_builder_set_member_name(builder, "tcpType");
+                    json_builder_add_string_value(builder, tcp_types[transport_type]);
+                }
+                json_builder_end_object(builder);
+                g_free(foundation);
+                g_free(address);
+                g_free(related_address);
             }
-            if (transport_type != OWR_TRANSPORT_TYPE_UDP) {
-                json_builder_set_member_name(builder, "tcpType");
-                json_builder_add_string_value(builder, tcp_types[transport_type]);
-            }
-            json_builder_end_object(builder);
-            g_free(foundation);
-            g_free(address);
-            g_free(related_address);
         }
         g_list_free(candidates);
-        json_builder_end_array(builder); /* candidates */
-        json_builder_end_object(builder); /* ice */
+        json_builder_end_array(builder); // candidates
+        json_builder_end_object(builder); // ice
 
         json_builder_set_member_name(builder, "dtls");
         json_builder_begin_object(builder);
@@ -994,7 +1003,7 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
     //GError *error;
     line = g_data_input_stream_read_line_finish_utf8(input_stream, result, &line_length, NULL);
     //g_print("ERROR:%s\n", error);
-    g_print("eventstream_line_read: %s\n", line);
+    g_print("eventstream_line_read:%s\n", line);
     if (line) {
         if (peer_joined && g_strstr_len(line, MIN(line_length, 5), "data:")) {
             peer_joined = FALSE;
@@ -1017,10 +1026,17 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
         else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 3), "sdp")) {
             handle_offer(line + 5, line_length - 5);
         }
-        // Add a new type
+        //so add a new type
         else if (g_strstr_len(line, MIN(line_length, 6), "offer:")) {
             handle_offer(line + 6, line_length - 6);
         }
+        else if (g_strstr_len(line, MIN(line_length, 7), "answer:")) {
+            /// TODO: Do we need this as well now?
+            //        Can we just push it through handle offer? No!
+            ///handle_answer(line + 7, line_length - 7);
+            g_print("TODO - HANDLE ANSWER");
+        }
+        // XXX: This makes nasty assumption about the layout of the json
         else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 9), "candidate")) {
             handle_remote_candidate(line + 5, line_length - 5);
         }
