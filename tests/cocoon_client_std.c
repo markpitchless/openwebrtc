@@ -14,6 +14,7 @@
 #include "owr_video_payload.h"
 #include "owr_video_renderer.h"
 
+#include <glib.h>
 #include <gio/gio.h>
 #include <json-glib/json-glib.h>
 #include <libsoup/soup.h>
@@ -21,19 +22,55 @@
 
 #define SERVER_URL "http://demo.openwebrtc.io:38080"
 
+// Command line setup
+
+static gboolean verbose = FALSE;
+
+// What to grab from the camera
+static gboolean use_video = TRUE;
+static gboolean use_audio = FALSE;
+
+// Include all the ICE candidates in the offer and answer JSON. Could also be
+// sent as seperate messages down the channel
+//gboolean candidates_in_offer = TRUE;
+//gboolean candidates_in_answer = TRUE;
+static gboolean candidates_in_offer = FALSE;
+static gboolean candidates_in_answer = FALSE;
+
+static gint repeats = 2;
+static gint max_size = 8;
+static gboolean beep = FALSE;
+static gboolean randomize = FALSE;
+
+static GOptionEntry entries[] =
+{
+  //{ "max-size", 'm', 0, G_OPTION_ARG_INT, &max_size, "Test up to 2^M items", "M" },
+  { "verbose", 'V', 0, G_OPTION_ARG_NONE, &verbose,
+      "Be verbose", NULL },
+  { "video", 'v', 0, G_OPTION_ARG_NONE, &use_video,
+      "Start video stream. On by default.", NULL },
+  { "audio", 'a', 0, G_OPTION_ARG_NONE, &use_audio,
+      "Start audio stream. Off by default.", NULL },
+  { "offer-candidates", 'O', 0, G_OPTION_ARG_NONE, &candidates_in_offer,
+      "Include candidates in offer", NULL },
+  { "answer-candidates", 'A', 0, G_OPTION_ARG_NONE, &candidates_in_offer,
+      "Include candidates in answer", NULL },
+  { NULL }
+};
+
+
+// Config
+
+
+
+// App data
+
 static GList *local_sources, *renderers;
 static OwrTransportAgent *transport_agent;
 static gchar *session_id, *peer_id;
 static guint client_id;
 static gchar *candidate_types[] = { "host", "srflx", "relay", NULL };
 static gchar *tcp_types[] = { "", "active", "passive", "so", NULL };
-
-// Include all the ICE candidates in the offer and answer JSON. Could also be
-// sent as seperate messages down the channel
-//gboolean candidates_in_offer = TRUE;
-//gboolean candidates_in_answer = TRUE;
-gboolean candidates_in_offer = FALSE;
-gboolean candidates_in_answer = FALSE;
 
 static void read_eventstream_line(GDataInputStream *input_stream, gpointer user_data);
 static void got_local_sources(GList *sources, gchar *url);
@@ -1225,10 +1262,19 @@ gint main(gint argc, gchar **argv)
     GMainContext *main_context;
     gchar *url;
 
-    if (argc < 2) {
-        g_print("Usage: %s <session id>\n", argv[0]);
-        return -1;
+    GError *error = NULL;
+    GOptionContext *context;
+    context = g_option_context_new ("- openwebrtc client");
+    //g_option_context_add_main_entries (context, entries, GETTEXT_PACKAGE);
+    g_option_context_add_main_entries (context, entries, NULL);
+    //g_option_context_add_group (context, gtk_get_option_group (TRUE));
+    if (!g_option_context_parse(context, &argc, &argv, &error))
+    {
+      g_print ("option parsing failed: %s\n", error->message);
+      exit (1);
     }
+    g_print("config: verbose:%i candidates_in_offer:%i candidates_in_answer:%i\n",
+            verbose, candidates_in_offer, candidates_in_answer);
 
     session_id = argv[1];
     client_id = g_random_int();
@@ -1239,11 +1285,12 @@ gint main(gint argc, gchar **argv)
     main_loop = g_main_loop_new(NULL, FALSE);
     main_context = g_main_context_default();
     owr_init_with_main_context(main_context);
-    // TODO: Just video for now to keep the line size inside the shell buffer.
-    //owr_get_capture_sources(OWR_MEDIA_TYPE_AUDIO | OWR_MEDIA_TYPE_VIDEO,
-    //    (OwrCaptureSourcesCallback)got_local_sources, url);
-    owr_get_capture_sources(OWR_MEDIA_TYPE_VIDEO,
-        (OwrCaptureSourcesCallback)got_local_sources, url);
+    OwrMediaType media_types;
+    if (use_video)
+        media_types |= OWR_MEDIA_TYPE_VIDEO;
+    if (use_audio)
+        media_types |= OWR_MEDIA_TYPE_AUDIO;
+    owr_get_capture_sources(media_types, (OwrCaptureSourcesCallback)got_local_sources, url);
 
     //g_timeout_add_seconds(4, (GSourceFunc)send_offer_cb, NULL);
 
