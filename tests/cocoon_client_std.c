@@ -468,9 +468,91 @@ static void send_offer()
     //    (GAsyncReadyCallback)answer_sent, NULL);
 }
 
+static void send_candidate(OwrCandidate *candidate)
+{
+    g_print("send_candidate:\n");
+    JsonBuilder *builder;
+    JsonGenerator *generator;
+    JsonNode *root;
+    gchar *json;
+    gsize json_length;
+    //SoupSession *soup_session;
+    //SoupMessage *soup_message;
+    //gchar *url;
+
+    builder = json_builder_new();
+    generator = json_generator_new();
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "candidate");
+
+    OwrCandidateType candidate_type;
+    OwrComponentType component_type;
+    OwrTransportType transport_type;
+    gchar *foundation, *address, *related_address;
+    gint port, priority, related_port;
+    candidate = OWR_CANDIDATE(candidate);
+    g_object_get(candidate, "type", &candidate_type, "component-type", &component_type,
+        "foundation", &foundation, "transport-type", &transport_type, "address", &address,
+        "port", &port, "priority", &priority, "base-address", &related_address,
+        "base-port", &related_port, NULL);
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "foundation");
+    json_builder_add_string_value(builder, foundation);
+    json_builder_set_member_name(builder, "componentId");
+    json_builder_add_int_value(builder, component_type);
+    json_builder_set_member_name(builder, "transport");
+    if (transport_type == OWR_TRANSPORT_TYPE_UDP)
+        json_builder_add_string_value(builder, "UDP");
+    else
+        json_builder_add_string_value(builder, "TCP");
+    json_builder_set_member_name(builder, "priority");
+    json_builder_add_int_value(builder, priority);
+    json_builder_set_member_name(builder, "address");
+    json_builder_add_string_value(builder, address);
+    json_builder_set_member_name(builder, "port");
+    json_builder_add_int_value(builder, port);
+    json_builder_set_member_name(builder, "type");
+    json_builder_add_string_value(builder, candidate_types[candidate_type]);
+    if (candidate_type != OWR_CANDIDATE_TYPE_HOST) {
+        json_builder_set_member_name(builder, "relatedAddress");
+        json_builder_add_string_value(builder, related_address);
+        json_builder_set_member_name(builder, "relatedPort");
+        json_builder_add_int_value(builder, related_port);
+    }
+    if (transport_type != OWR_TRANSPORT_TYPE_UDP) {
+        json_builder_set_member_name(builder, "tcpType");
+        json_builder_add_string_value(builder, tcp_types[transport_type]);
+    }
+    json_builder_end_object(builder);
+    g_free(foundation);
+    g_free(address);
+    g_free(related_address);
+    json_builder_end_object(builder); /* root */
+
+    //json_generator_set_pretty(generator, TRUE);
+    json_generator_set_pretty(generator, FALSE);
+    root = json_builder_get_root(builder);
+    json_generator_set_root(generator, root);
+    json = json_generator_to_data(generator, &json_length);
+    json_node_free(root);
+    g_print("candidate:%s\n", json);
+    g_object_unref(builder);
+    g_object_unref(generator);
+
+    //url = g_strdup_printf(SERVER_URL"/ctos/%s/%u/%s", session_id, client_id, peer_id);
+    //soup_session = soup_session_new();
+    //soup_message = soup_message_new("POST", url);
+    //g_free(url);
+    //soup_message_set_request(soup_message, "application/json",
+    //    SOUP_MEMORY_TAKE, json, json_length);
+    //soup_session_send_async(soup_session, soup_message, NULL,
+    //    (GAsyncReadyCallback)answer_sent, NULL);
+}
+
 static void got_candidate(GObject *media_session, OwrCandidate *candidate, gpointer user_data)
 {
     //g_print("got_candidate:\n");
+    send_candidate(candidate);
     GList *local_candidates;
     g_return_if_fail(!user_data);
 
