@@ -37,6 +37,9 @@ static gboolean use_audio = FALSE;
 static gboolean candidates_in_offer = FALSE;
 static gboolean candidates_in_answer = FALSE;
 
+// Send the offer at start, ie initiate a call
+static gboolean cfg_send_offer = FALSE;
+
 static gint repeats = 2;
 static gint max_size = 8;
 static gboolean beep = FALSE;
@@ -53,8 +56,10 @@ static GOptionEntry entries[] =
       "Start audio stream. Off by default.", NULL },
   { "offer-candidates", 'O', 0, G_OPTION_ARG_NONE, &candidates_in_offer,
       "Include candidates in offer", NULL },
-  { "answer-candidates", 'A', 0, G_OPTION_ARG_NONE, &candidates_in_offer,
+  { "answer-candidates", 'A', 0, G_OPTION_ARG_NONE, &candidates_in_answer,
       "Include candidates in answer", NULL },
+  { "send-offer", 's', 0, G_OPTION_ARG_NONE, &cfg_send_offer,
+      "Send an offer at startup, ie initiate a call.", NULL },
   { NULL }
 };
 
@@ -1285,14 +1290,17 @@ gint main(gint argc, gchar **argv)
     main_loop = g_main_loop_new(NULL, FALSE);
     main_context = g_main_context_default();
     owr_init_with_main_context(main_context);
+
+    //if (cfg_send_offer) {
     OwrMediaType media_types;
     if (use_video)
         media_types |= OWR_MEDIA_TYPE_VIDEO;
     if (use_audio)
         media_types |= OWR_MEDIA_TYPE_AUDIO;
-    owr_get_capture_sources(media_types, (OwrCaptureSourcesCallback)got_local_sources, url);
-
-    //g_timeout_add_seconds(4, (GSourceFunc)send_offer_cb, NULL);
+    owr_get_capture_sources(media_types, (OwrCaptureSourcesCallback)got_local_sources, NULL);
+    if (cfg_send_offer) {
+        g_timeout_add_seconds(3, (GSourceFunc)send_offer_cb, NULL);
+    }
 
     g_main_loop_run(main_loop);
     return 0;
