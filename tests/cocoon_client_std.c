@@ -470,21 +470,29 @@ static void send_offer()
 
 static void send_candidate(OwrCandidate *candidate)
 {
-    g_print("send_candidate:\n");
+    //g_print("send_candidate:\n");
     JsonBuilder *builder;
     JsonGenerator *generator;
     JsonNode *root;
     gchar *json;
     gsize json_length;
-    //SoupSession *soup_session;
-    //SoupMessage *soup_message;
-    //gchar *url;
 
     builder = json_builder_new();
     generator = json_generator_new();
     json_builder_begin_object(builder);
-    json_builder_set_member_name(builder, "candidate");
 
+    json_builder_set_member_name(builder, "candidate");
+    json_builder_begin_object(builder);
+    json_builder_set_member_name(builder, "sdpMLineIndex");
+    json_builder_add_int_value(builder, 0); // TODO
+    json_builder_set_member_name(builder, "sdpMid");
+    json_builder_add_string_value(builder, ""); // TODO video or string
+    // candidate: contains a sdp serialized version. TODO: Using dummy for now.
+    json_builder_set_member_name(builder, "candidate");
+    json_builder_add_string_value(builder, "sdp"); // TODO video or string
+    json_builder_end_object(builder);
+
+    json_builder_set_member_name(builder, "candidateDescription");
     OwrCandidateType candidate_type;
     OwrComponentType component_type;
     OwrTransportType transport_type;
@@ -538,15 +546,6 @@ static void send_candidate(OwrCandidate *candidate)
     g_print("candidate:%s\n", json);
     g_object_unref(builder);
     g_object_unref(generator);
-
-    //url = g_strdup_printf(SERVER_URL"/ctos/%s/%u/%s", session_id, client_id, peer_id);
-    //soup_session = soup_session_new();
-    //soup_message = soup_message_new("POST", url);
-    //g_free(url);
-    //soup_message_set_request(soup_message, "application/json",
-    //    SOUP_MEMORY_TAKE, json, json_length);
-    //soup_session_send_async(soup_session, soup_message, NULL,
-    //    (GAsyncReadyCallback)answer_sent, NULL);
 }
 
 static void got_candidate(GObject *media_session, OwrCandidate *candidate, gpointer user_data)
@@ -1078,10 +1077,17 @@ static void got_sources(GList *sources, gpointer user_data)
         OwrSourceType source_type;
         OwrMediaSession *media_session;
         GObject *session;
+        gchar *name = NULL;
 
         g_assert(OWR_IS_MEDIA_SOURCE(source));
 
-        g_object_get(source, "type", &source_type, "media-type", &media_type, NULL);
+        g_object_get(source,
+                "name", &name,
+                "type", &source_type,
+                "media-type", &media_type,
+                NULL);
+        g_message("Got local source: %s stype:%i mtype:%i\n",
+                name, source_type, media_type);
 
         media_session = owr_media_session_new(TRUE);
         session = G_OBJECT(media_session);
