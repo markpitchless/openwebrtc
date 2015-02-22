@@ -30,8 +30,10 @@ static gchar *tcp_types[] = { "", "active", "passive", "so", NULL };
 
 // Include all the ICE candidates in the offer and answer JSON. Could also be
 // sent as seperate messages down the channel
-gboolean candidates_in_offer = TRUE;
-gboolean candidates_in_answer = TRUE;
+//gboolean candidates_in_offer = TRUE;
+//gboolean candidates_in_answer = TRUE;
+gboolean candidates_in_offer = FALSE;
+gboolean candidates_in_answer = FALSE;
 
 static void read_eventstream_line(GDataInputStream *input_stream, gpointer user_data);
 static void got_local_sources(GList *sources, gchar *url);
@@ -1034,7 +1036,7 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
             /// TODO: Do we need this as well now?
             //        Can we just push it through handle offer? No!
             ///handle_answer(line + 7, line_length - 7);
-            g_print("TODO - HANDLE ANSWER");
+            g_print("TODO - HANDLE ANSWER\n");
         }
         // XXX: This makes nasty assumption about the layout of the json
         else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 9), "candidate")) {
