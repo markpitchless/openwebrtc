@@ -1060,7 +1060,7 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
     //GError *error;
     line = g_data_input_stream_read_line_finish_utf8(input_stream, result, &line_length, NULL);
     //g_print("ERROR:%s\n", error);
-    g_print("eventstream_line_read:%s\n", line);
+    g_debug("eventstream_line_read:%s", line);
     if (line) {
         if (peer_joined && g_strstr_len(line, MIN(line_length, 5), "data:")) {
             peer_joined = FALSE;
@@ -1109,7 +1109,7 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
 
 static void read_eventstream_line(GDataInputStream *input_stream, gpointer user_data)
 {
-    //g_print("read_eventstream_line:\n");
+    g_debug("read_eventstream_line: start async read");
     g_data_input_stream_read_line_async(input_stream, G_PRIORITY_DEFAULT, NULL,
         (GAsyncReadyCallback)eventstream_line_read, user_data);
 }
@@ -1117,7 +1117,7 @@ static void read_eventstream_line(GDataInputStream *input_stream, gpointer user_
 static void eventsource_request_sent(SoupSession *soup_session, GAsyncResult *result,
     gpointer user_data)
 {
-    g_print("eventsource_request_sent:\n");
+    g_print("eventsource_request_sent:");
     GInputStream *input_stream;
     GDataInputStream *data_input_stream;
 
@@ -1253,10 +1253,8 @@ static void got_local_sources(GList *sources, gchar *url)
     owr_transport_agent_add_helper_server(transport_agent, OWR_HELPER_SERVER_TYPE_STUN,
         "stun.services.mozilla.com", 3478, NULL, NULL);
     got_sources(sources, NULL);
-    if (url) {
-        send_eventsource_request(url);
-        g_free(url);
-    }
+    send_eventsource_request(url);
+    g_free(url);
 }
 
 
