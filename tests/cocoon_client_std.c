@@ -1296,7 +1296,7 @@ gint main(gint argc, gchar **argv)
     owr_init_with_main_context(main_context);
 
     //if (cfg_send_offer) {
-    OwrMediaType media_types;
+    OwrMediaType media_types = OWR_MEDIA_TYPE_UNKNOWN;
     if (use_video)
         media_types |= OWR_MEDIA_TYPE_VIDEO;
     if (use_audio)
