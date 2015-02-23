@@ -42,6 +42,8 @@ static gboolean candidates_in_answer = FALSE;
 // Send the offer at start, ie initiate a call
 static gboolean cfg_send_offer = FALSE;
 
+static gboolean pretty_json = FALSE;
+
 static gint repeats = 2;
 static gint max_size = 8;
 static gboolean beep = FALSE;
@@ -62,8 +64,10 @@ static GOptionEntry entries[] =
       "Include candidates in answer", NULL },
   { "send-offer", 's', 0, G_OPTION_ARG_NONE, &cfg_send_offer,
       "Send an offer at startup, ie initiate a call.", NULL },
-  { "self-view", 's', 0, G_OPTION_ARG_NONE, &show_self_view,
+  { "self-view", ' ', 0, G_OPTION_ARG_NONE, &show_self_view,
       "Show a self view window when using a capture source.", NULL },
+  { "pretty-json", 'p', 0, G_OPTION_ARG_NONE, &pretty_json,
+      "Pretty json.", NULL },
   { NULL }
 };
 
@@ -296,8 +300,7 @@ static void send_answer()
     json_builder_end_object(builder); /* sessionDescription */
     json_builder_end_object(builder); /* root */
 
-    //json_generator_set_pretty(generator, TRUE);
-    json_generator_set_pretty(generator, FALSE);
+    json_generator_set_pretty(generator, pretty_json);
     root = json_builder_get_root(builder);
     json_generator_set_root(generator, root);
     json = json_generator_to_data(generator, &json_length);
@@ -482,8 +485,7 @@ static void send_offer()
     json_builder_end_object(builder); /* sessionDescription */
     json_builder_end_object(builder); /* root */
 
-    //json_generator_set_pretty(generator, TRUE);
-    json_generator_set_pretty(generator, FALSE);
+    json_generator_set_pretty(generator, pretty_json);
     root = json_builder_get_root(builder);
     json_generator_set_root(generator, root);
     json = json_generator_to_data(generator, &json_length);
@@ -580,8 +582,7 @@ static void send_candidate(GObject *media_session, OwrCandidate *candidate)
     g_free(related_address);
     json_builder_end_object(builder); /* root */
 
-    //json_generator_set_pretty(generator, TRUE);
-    json_generator_set_pretty(generator, FALSE);
+    json_generator_set_pretty(generator, pretty_json);
     root = json_builder_get_root(builder);
     json_generator_set_root(generator, root);
     json = json_generator_to_data(generator, &json_length);
@@ -1279,15 +1280,17 @@ static void start_signalchannel()
     GDataInputStream *data_input_stream;
 
     input_stream = g_unix_input_stream_new(0, FALSE); // STDIN
-    gsize buffer_size;
 
     if (input_stream) {
         data_input_stream = g_data_input_stream_new(input_stream);
-        buffer_size = g_buffered_input_stream_get_buffer_size(G_BUFFERED_INPUT_STREAM(data_input_stream));
-        g_message("Buffer:%i", buffer_size);
-        g_buffered_input_stream_set_buffer_size(G_BUFFERED_INPUT_STREAM(data_input_stream), 8192);
-        buffer_size = g_buffered_input_stream_get_buffer_size(G_BUFFERED_INPUT_STREAM(data_input_stream));
-        g_message("Buffer:%i", buffer_size);
+        // Failed attempt to make buffer bigger for shell pastes. Doesn't work
+        // with STDIN, probably does with other streams.
+        //gsize buffer_size;
+        //g_object_get(data_input_stream, "buffer-size", &buffer_size, NULL);
+        //g_message("Buffer:%i", buffer_size);
+        //g_object_set(data_input_stream, "buffer-size", 8192, NULL);
+        //g_object_get(data_input_stream, "buffer-size", &buffer_size, NULL);
+        //g_message("Buffer:%i", buffer_size);
 
         // Start the input read loop on STDIN
         read_eventstream_line(data_input_stream, NULL);
