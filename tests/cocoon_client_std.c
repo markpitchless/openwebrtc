@@ -112,7 +112,7 @@ static void got_remote_source(OwrMediaSession *media_session, OwrMediaSource *so
 
 static gboolean can_send_answer()
 {
-    g_print("can_send_answer:\n");
+    g_debug("can_send_answer:");
     GObject *media_session;
     GList *media_sessions, *item;
 
@@ -653,7 +653,7 @@ static void local_candidate_gathering_done(GObject *media_session, gpointer user
 
 static void got_dtls_certificate(GObject *media_session, GParamSpec *pspec, gpointer user_data)
 {
-    g_print("got_dtls_certificate:\n");
+    g_debug("got_dtls_certificate:\n");
     guint i;
     gchar *pem, *line;
     guchar *der, *tmp;
@@ -688,6 +688,7 @@ static void got_dtls_certificate(GObject *media_session, GParamSpec *pspec, gpoi
             g_string_append(fingerprint, ":");
         g_string_append_printf(fingerprint, "%02X", digest[i]);
     }
+    g_print("fingerprint:sha-256 %s\n", fingerprint);
     g_object_set_data(media_session, "fingerprint", g_string_free(fingerprint, FALSE));
 
     g_free(digest);
