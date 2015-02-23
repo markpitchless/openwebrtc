@@ -536,10 +536,8 @@ static void send_candidate(GObject *media_session, OwrCandidate *candidate)
     }
     // candidate: contains a sdp serialized version. TODO: Using dummy for now.
     json_builder_set_member_name(builder, "candidate");
-    json_builder_add_string_value(builder, "sdp"); // TODO video or string
-    json_builder_end_object(builder);
+    json_builder_add_string_value(builder, "TODO"); // TODO video or string
 
-    json_builder_set_member_name(builder, "candidateDescription");
     OwrCandidateType candidate_type;
     OwrComponentType component_type;
     OwrTransportType transport_type;
@@ -550,6 +548,7 @@ static void send_candidate(GObject *media_session, OwrCandidate *candidate)
         "foundation", &foundation, "transport-type", &transport_type, "address", &address,
         "port", &port, "priority", &priority, "base-address", &related_address,
         "base-port", &related_port, NULL);
+    json_builder_set_member_name(builder, "candidateDescription");
     json_builder_begin_object(builder);
     json_builder_set_member_name(builder, "foundation");
     json_builder_add_string_value(builder, foundation);
@@ -578,6 +577,7 @@ static void send_candidate(GObject *media_session, OwrCandidate *candidate)
         json_builder_set_member_name(builder, "tcpType");
         json_builder_add_string_value(builder, tcp_types[transport_type]);
     }
+    json_builder_end_object(builder);
     json_builder_end_object(builder);
     g_free(foundation);
     g_free(address);
@@ -698,6 +698,8 @@ static OwrCandidate * candidate_from_positioned_json_reader(JsonReader *reader)
 
     json_reader_read_member(reader, "componentId");
     component_type = (OwrComponentType)json_reader_get_int_value(reader);
+    g_message("Read candidate type: %s %i componentId:%i",
+            cand_type, candidate_type, component_type);
     json_reader_end_member(reader);
 
     remote_candidate = owr_candidate_new(candidate_type, component_type);
@@ -1259,6 +1261,9 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
         // XXX: This makes nasty assumption about the layout of the json
         else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 9), "candidate")) {
             handle_remote_candidate(line + 5, line_length - 5);
+        }
+        else if (g_strstr_len(line, MIN(line_length, 10), "candidate:")) {
+            handle_remote_candidate(line + 10, line_length - 10);
         }
         g_free(line);
     }
