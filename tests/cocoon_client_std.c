@@ -743,7 +743,197 @@ static OwrCandidate * candidate_from_positioned_json_reader(JsonReader *reader)
 
 static void handle_offer(gchar *message, gsize message_length)
 {
-    g_print("handle_offer:\n");
+    g_message("handle_offer:\n");
+    JsonParser *parser;
+    JsonReader *reader;
+    gint i, number_of_media_descriptions;
+    const gchar *mtype;
+    OwrMediaType media_type = OWR_MEDIA_TYPE_UNKNOWN;
+    gboolean rtcp_mux;
+    OwrMediaSession *media_session;
+    GObject *session;
+    gint j, number_of_payloads, number_of_candidates;
+    gint64 payload_type, clock_rate, channels = 0;
+    const gchar *encoding_name;
+    gboolean ccm_fir = FALSE, nack_pli = FALSE;
+    OwrCodecType codec_type;
+    OwrCandidate *remote_candidate;
+    OwrComponentType component_type;
+    const gchar *ice_ufrag, *ice_password;
+    OwrPayload *send_payload, *receive_payload;
+    GList *list_item;
+    OwrMediaSource *source;
+    OwrMediaType source_media_type;
+    GList *media_sessions;
+
+    parser = json_parser_new();
+    json_parser_load_from_data(parser, message, message_length, NULL);
+    reader = json_reader_new(json_parser_get_root(parser));
+    json_reader_read_member(reader, "sessionDescription");
+    json_reader_read_member(reader, "mediaDescriptions");
+
+    // For each of the mediaDescriptions in the JSON create a OWRMediaSession
+    number_of_media_descriptions = json_reader_count_elements(reader);
+    for (i = 0; i < number_of_media_descriptions; i++) {
+        json_reader_read_element(reader, i);
+        media_session = owr_media_session_new(TRUE);
+        session = G_OBJECT(media_session);
+
+        json_reader_read_member(reader, "type");
+        mtype = json_reader_get_string_value(reader);
+        g_object_set_data(session, "media-type", g_strdup(mtype));
+        json_reader_end_member(reader);
+
+        json_reader_read_member(reader, "rtcp");
+        json_reader_read_member(reader, "mux");
+        rtcp_mux = json_reader_get_boolean_value(reader);
+        g_object_set(media_session, "rtcp-mux", rtcp_mux, NULL);
+        json_reader_end_member(reader);
+        json_reader_end_member(reader);
+
+        // Create OwrPayload structs for each payload in the media session.
+        // // Each payload generates a send_payload and receive_payload
+        json_reader_read_member(reader, "payloads");
+        number_of_payloads = json_reader_count_elements(reader);
+        codec_type = OWR_CODEC_TYPE_NONE;
+        for (j = 0; j < number_of_payloads && codec_type == OWR_CODEC_TYPE_NONE; j++) {
+            json_reader_read_element(reader, j);
+
+            json_reader_read_member(reader, "encodingName");
+            encoding_name = json_reader_get_string_value(reader);
+            json_reader_end_member(reader);
+
+            json_reader_read_member(reader, "type");
+            payload_type = json_reader_get_int_value(reader);
+            json_reader_end_member(reader);
+
+            json_reader_read_member(reader, "clockRate");
+            clock_rate = json_reader_get_int_value(reader);
+            json_reader_end_member(reader);
+
+            send_payload = receive_payload = NULL;
+            if (!g_strcmp0(mtype, "audio")) {
+                media_type = OWR_MEDIA_TYPE_AUDIO;
+                if (!g_strcmp0(encoding_name, "PCMA"))
+                    codec_type = OWR_CODEC_TYPE_PCMA;
+                else if (!g_strcmp0(encoding_name, "PCMU"))
+                    codec_type = OWR_CODEC_TYPE_PCMU;
+                else if (!g_strcmp0(encoding_name, "OPUS") || !g_strcmp0(encoding_name, "opus"))
+                    codec_type = OWR_CODEC_TYPE_OPUS;
+                else
+                    continue;
+
+                json_reader_read_member(reader, "channels");
+                channels = json_reader_get_int_value(reader);
+                json_reader_end_member(reader);
+
+                send_payload = owr_audio_payload_new(codec_type, payload_type, clock_rate,
+                    channels);
+                receive_payload = owr_audio_payload_new(codec_type, payload_type, clock_rate,
+                    channels);
+            } else if (!g_strcmp0(mtype, "video")) {
+                media_type = OWR_MEDIA_TYPE_VIDEO;
+                if (!g_strcmp0(encoding_name, "H264"))
+                    codec_type = OWR_CODEC_TYPE_H264;
+                else if (!g_strcmp0(encoding_name, "VP8"))
+                    codec_type = OWR_CODEC_TYPE_VP8;
+                else
+                    continue;
+
+                json_reader_read_member(reader, "ccmfir");
+                ccm_fir = json_reader_get_boolean_value(reader);
+                json_reader_end_member(reader);
+                json_reader_read_member(reader, "nackpli");
+                nack_pli = json_reader_get_boolean_value(reader);
+                json_reader_end_member(reader);
+
+                send_payload = owr_video_payload_new(codec_type, payload_type, clock_rate,
+                    ccm_fir, nack_pli);
+                receive_payload = owr_video_payload_new(codec_type, payload_type, clock_rate,
+                    ccm_fir, nack_pli);
+            } else
+                g_warn_if_reached();
+
+            // // If we get a good pair then add them to the media_session.
+            if (send_payload && receive_payload) {
+                g_object_set_data(session, "encoding-name", g_strdup(encoding_name));
+                g_object_set_data(session, "payload-type", GUINT_TO_POINTER(payload_type));
+                g_object_set_data(session, "clock-rate", GUINT_TO_POINTER(clock_rate));
+                if (OWR_IS_AUDIO_PAYLOAD(send_payload))
+                    g_object_set_data(session, "channels", GUINT_TO_POINTER(channels));
+                else if (OWR_IS_VIDEO_PAYLOAD(send_payload)) {
+                    g_object_set_data(session, "ccm-fir", GUINT_TO_POINTER(ccm_fir));
+                    g_object_set_data(session, "nack-pli", GUINT_TO_POINTER(nack_pli));
+                } else
+                    g_warn_if_reached();
+
+                owr_media_session_add_receive_payload(media_session, receive_payload);
+                owr_media_session_set_send_payload(media_session, send_payload);
+            }
+            json_reader_end_element(reader);
+        }
+        json_reader_end_member(reader); /* payloads */
+
+        json_reader_read_member(reader, "ice");
+        json_reader_read_member(reader, "ufrag");
+        ice_ufrag = json_reader_get_string_value(reader);
+        g_object_set_data_full(session, "remote-ice-ufrag", g_strdup(ice_ufrag), g_free);
+        json_reader_end_member(reader);
+        json_reader_read_member(reader, "password");
+        ice_password = json_reader_get_string_value(reader);
+        g_object_set_data_full(session, "remote-ice-password", g_strdup(ice_password), g_free);
+        json_reader_end_member(reader);
+        if (json_reader_read_member(reader, "candidates")) {
+            number_of_candidates = json_reader_count_elements(reader);
+            for (j = 0; j < number_of_candidates; j++) {
+                json_reader_read_element(reader, j);
+                remote_candidate = candidate_from_positioned_json_reader(reader);
+                g_object_set(remote_candidate, "ufrag", ice_ufrag, "password", ice_password, NULL);
+                g_object_get(remote_candidate, "component-type", &component_type, NULL);
+                if (!rtcp_mux || component_type != OWR_COMPONENT_TYPE_RTCP)
+                    owr_session_add_remote_candidate(OWR_SESSION(media_session), remote_candidate);
+                else
+                    g_object_unref(remote_candidate);
+                json_reader_end_element(reader);
+            }
+            json_reader_end_member(reader); /* candidates */
+        }
+        json_reader_end_member(reader); /* ice */
+
+        json_reader_end_element(reader);
+
+        g_signal_connect(media_session, "on-incoming-source", G_CALLBACK(got_remote_source), NULL);
+        g_signal_connect(media_session, "on-new-candidate", G_CALLBACK(got_candidate), NULL);
+        g_signal_connect(media_session, "on-candidate-gathering-done",
+            G_CALLBACK(candidate_gathering_done), NULL);
+        g_signal_connect(media_session, "notify::dtls-certificate",
+            G_CALLBACK(got_dtls_certificate), NULL);
+
+        // Search the local sources for the media-type, if we get a match then
+        // link up the sessions.
+        for (list_item = local_sources; list_item; list_item = list_item->next) {
+            source = OWR_MEDIA_SOURCE(list_item->data);
+            g_object_get(source, "media-type", &source_media_type, NULL);
+            if (source_media_type == media_type) {
+                local_sources = g_list_remove(local_sources, source);
+                owr_media_session_set_send_source(media_session, source);
+                break;
+            }
+        }
+        media_sessions = g_object_get_data(G_OBJECT(transport_agent), "media-sessions");
+        media_sessions = g_list_append(media_sessions, media_session);
+        g_object_set_data(G_OBJECT(transport_agent), "media-sessions", media_sessions);
+        owr_transport_agent_add_session(transport_agent, OWR_SESSION(media_session));
+    }
+    json_reader_end_member(reader);
+    json_reader_end_member(reader);
+    g_object_unref(reader);
+    g_object_unref(parser);
+}
+
+static void handle_answer(gchar *message, gsize message_length)
+{
+    g_message("handle_answer:\n");
     JsonParser *parser;
     JsonReader *reader;
     gint i, number_of_media_descriptions;
@@ -1059,10 +1249,7 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
             handle_offer(line + 6, line_length - 6);
         }
         else if (g_strstr_len(line, MIN(line_length, 7), "answer:")) {
-            /// TODO: Do we need this as well now?
-            //        Can we just push it through handle offer? No!
-            ///handle_answer(line + 7, line_length - 7);
-            g_print("TODO - HANDLE ANSWER\n");
+            handle_answer(line + 7, line_length - 7);
         }
         // XXX: This makes nasty assumption about the layout of the json
         else if (g_strstr_len(line + 7, MIN(MAX(line_length - 7, 0), 9), "candidate")) {
@@ -1248,10 +1435,8 @@ gint main(gint argc, gchar **argv)
 
     //if (cfg_send_offer) {
     OwrMediaType media_types = OWR_MEDIA_TYPE_UNKNOWN;
-    if (use_video)
-        media_types |= OWR_MEDIA_TYPE_VIDEO;
-    if (use_audio)
-        media_types |= OWR_MEDIA_TYPE_AUDIO;
+    if (use_video) media_types |= OWR_MEDIA_TYPE_VIDEO;
+    if (use_audio) media_types |= OWR_MEDIA_TYPE_AUDIO;
     owr_get_capture_sources(media_types, (OwrCaptureSourcesCallback)got_local_sources, NULL);
     if (cfg_send_offer) {
         g_timeout_add_seconds(3, (GSourceFunc)send_offer_cb, NULL);
