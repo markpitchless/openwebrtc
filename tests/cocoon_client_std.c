@@ -83,7 +83,7 @@ static gchar *candidate_types[] = { "host", "srflx", "relay", NULL };
 static gchar *tcp_types[] = { "", "active", "passive", "so", NULL };
 
 static void read_eventstream_line(GDataInputStream *input_stream, gpointer user_data);
-static void got_local_sources(GList *sources, gchar *url);
+static void got_local_sources(GList *sources);
 
 static void got_remote_source(OwrMediaSession *media_session, OwrMediaSource *source,
     gpointer user_data)
@@ -1114,14 +1114,11 @@ static void read_eventstream_line(GDataInputStream *input_stream, gpointer user_
         (GAsyncReadyCallback)eventstream_line_read, user_data);
 }
 
-static void eventsource_request_sent(SoupSession *soup_session, GAsyncResult *result,
-    gpointer user_data)
+static void start_signalchannel()
 {
-    g_print("eventsource_request_sent:");
+    g_message("Starting signal channel (stdin)");
     GInputStream *input_stream;
     GDataInputStream *data_input_stream;
-
-    //input_stream = soup_session_send_finish(soup_session, result, NULL);
 
     input_stream = g_unix_input_stream_new(0, FALSE); // STDIN
     gsize buffer_size;
@@ -1129,26 +1126,17 @@ static void eventsource_request_sent(SoupSession *soup_session, GAsyncResult *re
     if (input_stream) {
         data_input_stream = g_data_input_stream_new(input_stream);
         buffer_size = g_buffered_input_stream_get_buffer_size(G_BUFFERED_INPUT_STREAM(data_input_stream));
-        g_print("Buffer:%i\n", buffer_size);
+        g_message("Buffer:%i", buffer_size);
         g_buffered_input_stream_set_buffer_size(G_BUFFERED_INPUT_STREAM(data_input_stream), 8192);
         buffer_size = g_buffered_input_stream_get_buffer_size(G_BUFFERED_INPUT_STREAM(data_input_stream));
-        g_print("Buffer:%i\n", buffer_size);
-        read_eventstream_line(data_input_stream, user_data);
-    } else
-        g_warning("Failed to connect to the server");
-}
+        g_message("Buffer:%i", buffer_size);
 
-static void send_eventsource_request(const gchar *url)
-{
-    g_print("send_eventsource_request: %s\n", url);
-    //SoupSession *soup_session;
-    //SoupMessage *soup_message;
-
-    //soup_session = soup_session_new();
-    //soup_message = soup_message_new("GET", url);
-    //soup_session_send_async(soup_session, soup_message, NULL,
-    //    (GAsyncReadyCallback)eventsource_request_sent, NULL);
-    eventsource_request_sent(NULL, NULL, NULL);
+        // Start the input read loop on STDIN
+        read_eventstream_line(data_input_stream, NULL);
+    }
+    else {
+        g_error("Failed to connect to stdin");
+    }
 }
 
 static void got_sources(GList *sources, gpointer user_data)
@@ -1245,7 +1233,7 @@ static void got_sources(GList *sources, gpointer user_data)
     }
 }
 
-static void got_local_sources(GList *sources, gchar *url)
+static void got_local_sources(GList *sources)
 {
     g_message("Found local sources");
     local_sources = g_list_copy(sources);
@@ -1253,8 +1241,7 @@ static void got_local_sources(GList *sources, gchar *url)
     owr_transport_agent_add_helper_server(transport_agent, OWR_HELPER_SERVER_TYPE_STUN,
         "stun.services.mozilla.com", 3478, NULL, NULL);
     got_sources(sources, NULL);
-    send_eventsource_request(url);
-    g_free(url);
+    start_signalchannel();
 }
 
 
