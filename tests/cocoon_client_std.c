@@ -63,6 +63,11 @@ static GOptionEntry entries[] =
   { NULL }
 };
 
+static void print_config()
+{
+    g_print("config: verbose:%i video:%i audio:%i, candidates_in_offer:%i candidates_in_answer:%i\n",
+            verbose, use_video, use_audio, candidates_in_offer, candidates_in_answer);
+}
 
 // Config
 
@@ -1278,8 +1283,7 @@ gint main(gint argc, gchar **argv)
       g_print ("option parsing failed: %s\n", error->message);
       exit (1);
     }
-    g_print("config: verbose:%i candidates_in_offer:%i candidates_in_answer:%i\n",
-            verbose, candidates_in_offer, candidates_in_answer);
+    print_config();
 
     session_id = argv[1];
     client_id = g_random_int();
