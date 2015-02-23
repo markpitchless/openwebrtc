@@ -142,7 +142,7 @@ static void answer_sent(SoupSession *soup_session, GAsyncResult *result, gpointe
 
 static void send_answer()
 {
-    g_print("send_answer:\n");
+    g_message("send_answer:");
     JsonBuilder *builder;
     JsonGenerator *generator;
     JsonNode *root;
@@ -158,8 +158,6 @@ static void send_answer()
     gchar *fingerprint;
     gchar *json;
     gsize json_length;
-    SoupSession *soup_session;
-    SoupMessage *soup_message;
     gchar *url;
 
     builder = json_builder_new();
@@ -311,18 +309,10 @@ static void send_answer()
     json_generator_set_root(generator, root);
     json = json_generator_to_data(generator, &json_length);
     json_node_free(root);
-    g_print("answer:%s\n", json);
     g_object_unref(builder);
     g_object_unref(generator);
 
-    //url = g_strdup_printf(SERVER_URL"/ctos/%s/%u/%s", session_id, client_id, peer_id);
-    //soup_session = soup_session_new();
-    //soup_message = soup_message_new("POST", url);
-    //g_free(url);
-    //soup_message_set_request(soup_message, "application/json",
-    //    SOUP_MEMORY_TAKE, json, json_length);
-    //soup_session_send_async(soup_session, soup_message, NULL,
-    //    (GAsyncReadyCallback)answer_sent, NULL);
+    g_print("answer:%s\n", json);
 }
 
 static void send_offer()
