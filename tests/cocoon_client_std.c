@@ -1152,7 +1152,6 @@ static void send_eventsource_request(const gchar *url)
 
 static void got_sources(GList *sources, gpointer user_data)
 {
-    g_print("got_sources\n");
     OwrMediaSource *source = NULL;
     static gboolean have_video = FALSE, have_audio = FALSE;
     OwrMediaRenderer *video_renderer = NULL;
@@ -1174,7 +1173,7 @@ static void got_sources(GList *sources, gpointer user_data)
                 "type", &source_type,
                 "media-type", &media_type,
                 NULL);
-        g_message("Got local source: %s stype:%i mtype:%i\n",
+        g_message("Got local source: %s stype:%i mtype:%i",
                 name, source_type, media_type);
 
         media_session = owr_media_session_new(TRUE);
@@ -1195,7 +1194,6 @@ static void got_sources(GList *sources, gpointer user_data)
             G_CALLBACK(got_dtls_certificate), NULL);
 
         if (!have_video && media_type == OWR_MEDIA_TYPE_VIDEO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
-            g_print("VIDEO\n");
             OwrVideoRenderer *renderer;
             OwrPayload *payload;
 
@@ -1214,6 +1212,7 @@ static void got_sources(GList *sources, gpointer user_data)
             media_sessions = g_list_append(media_sessions, media_session);
             g_object_set_data(G_OBJECT(transport_agent), "media-sessions", media_sessions);
             owr_transport_agent_add_session(transport_agent, OWR_SESSION(media_session));
+            g_message("Added video soure");
 
             //g_print("Displaying self-view\n");
             //renderer = owr_video_renderer_new(NULL);
@@ -1222,7 +1221,6 @@ static void got_sources(GList *sources, gpointer user_data)
             //owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
             //video_renderer = OWR_MEDIA_RENDERER(renderer);
         } else if (!have_audio && media_type == OWR_MEDIA_TYPE_AUDIO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
-            g_print("AUDIO\n");
             OwrPayload *payload;
 
             have_audio = TRUE;
@@ -1236,6 +1234,7 @@ static void got_sources(GList *sources, gpointer user_data)
             media_sessions = g_list_append(media_sessions, media_session);
             g_object_set_data(G_OBJECT(transport_agent), "media-sessions", media_sessions);
             owr_transport_agent_add_session(transport_agent, OWR_SESSION(media_session));
+            g_message("Added audio soure");
         }
 
         if (have_video && have_audio)
@@ -1247,7 +1246,7 @@ static void got_sources(GList *sources, gpointer user_data)
 
 static void got_local_sources(GList *sources, gchar *url)
 {
-    g_print("got_local_sources: %s\n", url);
+    g_message("Found local sources");
     local_sources = g_list_copy(sources);
     transport_agent = owr_transport_agent_new(FALSE);
     owr_transport_agent_add_helper_server(transport_agent, OWR_HELPER_SERVER_TYPE_STUN,
@@ -1306,6 +1305,7 @@ gint main(gint argc, gchar **argv)
         g_timeout_add_seconds(3, (GSourceFunc)send_offer_cb, NULL);
     }
 
+    g_debug("Starting main loop");
     g_main_loop_run(main_loop);
     return 0;
 }
