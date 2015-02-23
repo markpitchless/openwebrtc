@@ -38,6 +38,7 @@ static gboolean show_self_view = FALSE;
 //gboolean candidates_in_answer = TRUE;
 static gboolean candidates_in_offer = FALSE;
 static gboolean candidates_in_answer = FALSE;
+static gboolean trickle_candidates = FALSE;
 
 // Send the offer at start, ie initiate a call
 static gboolean cfg_send_offer = FALSE;
@@ -51,7 +52,6 @@ static gboolean randomize = FALSE;
 
 static GOptionEntry entries[] =
 {
-  //{ "max-size", 'm', 0, G_OPTION_ARG_INT, &max_size, "Test up to 2^M items", "M" },
   { "verbose", 'V', 0, G_OPTION_ARG_NONE, &verbose,
       "Be verbose", NULL },
   { "video", 'v', 0, G_OPTION_ARG_NONE, &use_video,
@@ -62,9 +62,11 @@ static GOptionEntry entries[] =
       "Include candidates in offer", NULL },
   { "answer-candidates", 'A', 0, G_OPTION_ARG_NONE, &candidates_in_answer,
       "Include candidates in answer", NULL },
+  { "trickle-candidates", 'A', 0, G_OPTION_ARG_NONE, &trickle_candidates,
+      "Trickle candidates down the signal channel.", NULL },
   { "send-offer", 's', 0, G_OPTION_ARG_NONE, &cfg_send_offer,
       "Send an offer at startup, ie initiate a call.", NULL },
-  { "self-view", ' ', 0, G_OPTION_ARG_NONE, &show_self_view,
+  { "self-view", 0, 0, G_OPTION_ARG_NONE, &show_self_view,
       "Show a self view window when using a capture source.", NULL },
   { "pretty-json", 'p', 0, G_OPTION_ARG_NONE, &pretty_json,
       "Pretty json.", NULL },
@@ -73,8 +75,8 @@ static GOptionEntry entries[] =
 
 static void print_config()
 {
-    g_print("config: verbose:%i video:%i audio:%i, candidates_in_offer:%i candidates_in_answer:%i\n",
-            verbose, use_video, use_audio, candidates_in_offer, candidates_in_answer);
+    g_message("config: verbose:%i video:%i audio:%i candidates_in_offer:%i candidates_in_answer:%i trickle:%i",
+            verbose, use_video, use_audio, candidates_in_offer, candidates_in_answer, trickle_candidates);
 }
 
 
@@ -598,7 +600,9 @@ static void got_candidate(GObject *media_session, OwrCandidate *candidate, gpoin
     GList *local_candidates;
     g_return_if_fail(!user_data);
 
-    send_candidate(media_session, candidate);
+    if (trickle_candidates) {
+        send_candidate(media_session, candidate);
+    }
 
     local_candidates = g_object_get_data(media_session, "local-candidates");
     local_candidates = g_list_append(local_candidates, candidate);
@@ -617,7 +621,7 @@ static void candidate_gathering_done(GObject *media_session, gpointer user_data)
 
 static void local_candidate_gathering_done(GObject *media_session, gpointer user_data)
 {
-    g_print("local_candidate_gathering_done:\n");
+    g_message("local_candidate_gathering_done:");
     g_return_if_fail(!user_data);
     g_object_set_data(media_session, "gathering-done", GUINT_TO_POINTER(1));
     // TODO: Is this where to hook can send offer?
