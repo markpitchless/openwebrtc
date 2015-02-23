@@ -17,12 +17,12 @@
 #include <glib.h>
 #include <gio/gio.h>
 #include <json-glib/json-glib.h>
-#include <libsoup/soup.h>
 #include <string.h>
 
-#define SERVER_URL "http://demo.openwebrtc.io:38080"
 
-// Command line setup
+/*
+ * Config. Command line args setup.
+ */
 
 static gboolean verbose = FALSE;
 
@@ -69,11 +69,10 @@ static void print_config()
             verbose, use_video, use_audio, candidates_in_offer, candidates_in_answer);
 }
 
-// Config
 
-
-
-// App data
+/*
+ * App data
+ */
 
 static GList *local_sources, *renderers;
 static OwrTransportAgent *transport_agent;
@@ -84,6 +83,10 @@ static gchar *tcp_types[] = { "", "active", "passive", "so", NULL };
 
 static void read_eventstream_line(GDataInputStream *input_stream, gpointer user_data);
 static void got_local_sources(GList *sources);
+
+/*
+ * App
+ */
 
 static void got_remote_source(OwrMediaSession *media_session, OwrMediaSource *source,
     gpointer user_data)
@@ -127,19 +130,6 @@ static gboolean can_send_answer()
     return TRUE;
 }
 
-static void answer_sent(SoupSession *soup_session, GAsyncResult *result, gpointer user_data)
-{
-    g_print("answer_sent:\n");
-    GInputStream *input_stream;
-    g_return_if_fail(!user_data);
-
-    input_stream = soup_session_send_finish(soup_session, result, NULL);
-    if (!input_stream)
-        g_warning("Failed to send answer to server");
-    else
-        g_object_unref(input_stream);
-}
-
 static void send_answer()
 {
     g_message("send_answer:");
@@ -158,7 +148,6 @@ static void send_answer()
     gchar *fingerprint;
     gchar *json;
     gsize json_length;
-    gchar *url;
 
     builder = json_builder_new();
     generator = json_generator_new();
@@ -317,7 +306,7 @@ static void send_answer()
 
 static void send_offer()
 {
-    g_print("send_offer:\n");
+    g_message("send_offer:");
     JsonBuilder *builder;
     JsonGenerator *generator;
     JsonNode *root;
@@ -333,9 +322,6 @@ static void send_offer()
     gchar *fingerprint;
     gchar *json;
     gsize json_length;
-    SoupSession *soup_session;
-    SoupMessage *soup_message;
-    gchar *url;
 
     builder = json_builder_new();
     generator = json_generator_new();
@@ -505,15 +491,6 @@ static void send_offer()
     g_print("event:user-%i\n", client_id);
     //g_print("data:%s\n", json);
     g_print("offer:%s\n", json);
-
-    //url = g_strdup_printf(SERVER_URL"/ctos/%s/%u/%s", session_id, client_id, peer_id);
-    //soup_session = soup_session_new();
-    //soup_message = soup_message_new("POST", url);
-    //g_free(url);
-    //soup_message_set_request(soup_message, "application/json",
-    //    SOUP_MEMORY_TAKE, json, json_length);
-    //soup_session_send_async(soup_session, soup_message, NULL,
-    //    (GAsyncReadyCallback)answer_sent, NULL);
 }
 
 static void send_candidate(GObject *media_session, OwrCandidate *candidate)
@@ -1245,7 +1222,6 @@ gint main(gint argc, gchar **argv)
 {
     GMainLoop *main_loop;
     GMainContext *main_context;
-    gchar *url;
 
     GError *error = NULL;
     GOptionContext *context;
@@ -1265,7 +1241,6 @@ gint main(gint argc, gchar **argv)
 
     g_print("event:join\ndata:%i\n:\n", client_id);
 
-    url = g_strdup_printf(SERVER_URL"/stoc/%s/%u", session_id, client_id);
     main_loop = g_main_loop_new(NULL, FALSE);
     main_context = g_main_context_default();
     owr_init_with_main_context(main_context);
