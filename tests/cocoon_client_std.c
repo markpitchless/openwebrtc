@@ -655,7 +655,7 @@ static void got_dtls_certificate(GObject *media_session, GParamSpec *pspec, gpoi
             g_string_append(fingerprint, ":");
         g_string_append_printf(fingerprint, "%02X", digest[i]);
     }
-    g_print("fingerprint:sha-256 %s\n", fingerprint);
+    g_print("fingerprint:sha-256 %s\n", fingerprint->str);
     g_object_set_data(media_session, "fingerprint", g_string_free(fingerprint, FALSE));
 
     g_free(digest);
