@@ -91,6 +91,9 @@ static guint client_id;
 static gchar *candidate_types[] = { "host", "srflx", "relay", NULL };
 static gchar *tcp_types[] = { "", "active", "passive", "so", NULL };
 
+static gboolean is_signal_line_buffer_open = FALSE;
+static GString *signal_line_buffer;
+
 static void read_eventstream_line(GDataInputStream *input_stream, gpointer user_data);
 static void got_local_sources(GList *sources);
 
@@ -1230,7 +1233,26 @@ static void eventstream_line_read(GDataInputStream *input_stream, GAsyncResult *
     //g_print("ERROR:%s\n", error);
     g_debug("eventstream_line_read:%s", line);
     if (line) {
-        if (peer_joined && g_strstr_len(line, MIN(line_length, 5), "data:")) {
+        if (is_signal_line_buffer_open && g_strstr_len(line, MIN(line_length, 4), "end:")) {
+            gchar *action = g_strndup(line + 4, line_length - 4);
+            g_debug("End buffer read (%s):%s", action, signal_line_buffer->str);
+            is_signal_line_buffer_open = FALSE;
+            line = g_strdup(signal_line_buffer->str);
+            line_length = signal_line_buffer->len;
+        }
+
+        if (is_signal_line_buffer_open) {
+            g_string_append(signal_line_buffer, line);
+            g_string_append(signal_line_buffer, "\n"); // XXX
+        }
+        else if (g_strstr_len(line, MIN(line_length, 6), "start:")) {
+            gchar *action = g_strndup(line + 6, line_length - 6);
+            g_message("Start buffer read");
+            g_string_assign(signal_line_buffer, action);
+            g_string_append(signal_line_buffer, ":");
+            is_signal_line_buffer_open = TRUE;
+        }
+        else if (peer_joined && g_strstr_len(line, MIN(line_length, 5), "data:")) {
             peer_joined = FALSE;
             g_free(peer_id);
             peer_id = g_strndup(line + 5, line_length - 5);
@@ -1289,6 +1311,8 @@ static void start_signalchannel()
     GDataInputStream *data_input_stream;
 
     input_stream = g_unix_input_stream_new(0, FALSE); // STDIN
+
+    signal_line_buffer = g_string_new("");
 
     if (input_stream) {
         data_input_stream = g_data_input_stream_new(input_stream);
