@@ -30,6 +30,8 @@ static gboolean verbose = FALSE;
 static gboolean use_video = TRUE;
 static gboolean use_audio = FALSE;
 
+static gboolean show_self_view = FALSE;
+
 // Include all the ICE candidates in the offer and answer JSON. Could also be
 // sent as seperate messages down the channel
 //gboolean candidates_in_offer = TRUE;
@@ -60,6 +62,8 @@ static GOptionEntry entries[] =
       "Include candidates in answer", NULL },
   { "send-offer", 's', 0, G_OPTION_ARG_NONE, &cfg_send_offer,
       "Send an offer at startup, ie initiate a call.", NULL },
+  { "self-view", 's', 0, G_OPTION_ARG_NONE, &show_self_view,
+      "Show a self view window when using a capture source.", NULL },
   { NULL }
 };
 
@@ -1124,13 +1128,8 @@ static void got_sources(GList *sources, gpointer user_data)
 
         g_assert(OWR_IS_MEDIA_SOURCE(source));
 
-        g_object_get(source,
-                "name", &name,
-                "type", &source_type,
-                "media-type", &media_type,
-                NULL);
-        g_message("Got local source: %s stype:%i mtype:%i",
-                name, source_type, media_type);
+        g_object_get(source, "name", &name, "type", &source_type, "media-type", &media_type, NULL);
+        g_message("Got local source: %s stype:%i mtype:%i", name, source_type, media_type);
 
         media_session = owr_media_session_new(TRUE);
         session = G_OBJECT(media_session);
@@ -1170,12 +1169,14 @@ static void got_sources(GList *sources, gpointer user_data)
             owr_transport_agent_add_session(transport_agent, OWR_SESSION(media_session));
             g_message("Added video soure");
 
-            //g_print("Displaying self-view\n");
-            //renderer = owr_video_renderer_new(NULL);
-            //g_assert(renderer);
-            //g_object_set(renderer, "width", 1280, "height", 720, "max-framerate", 30.0, NULL);
-            //owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
-            //video_renderer = OWR_MEDIA_RENDERER(renderer);
+            if (show_self_view) {
+                g_message("Displaying self-view");
+                renderer = owr_video_renderer_new(NULL);
+                g_assert(renderer);
+                g_object_set(renderer, "width", 1280, "height", 720, "max-framerate", 30.0, NULL);
+                owr_media_renderer_set_source(OWR_MEDIA_RENDERER(renderer), source);
+                video_renderer = OWR_MEDIA_RENDERER(renderer);
+            }
         } else if (!have_audio && media_type == OWR_MEDIA_TYPE_AUDIO && source_type == OWR_SOURCE_TYPE_CAPTURE) {
             OwrPayload *payload;
 
