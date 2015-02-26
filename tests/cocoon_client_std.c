@@ -1090,10 +1090,13 @@ static void handle_answer(gchar *message, gsize message_length)
                 remote_candidate = candidate_from_positioned_json_reader(reader);
                 g_object_set(remote_candidate, "ufrag", ice_ufrag, "password", ice_password, NULL);
                 g_object_get(remote_candidate, "component-type", &component_type, NULL);
-                if (!rtcp_mux || component_type != OWR_COMPONENT_TYPE_RTCP)
+                if (!rtcp_mux || component_type != OWR_COMPONENT_TYPE_RTCP) {
+                    g_message("Adding candidate");
                     owr_session_add_remote_candidate(OWR_SESSION(media_session), remote_candidate);
-                else
+                }
+                else {
                     g_object_unref(remote_candidate);
+                }
                 json_reader_end_element(reader);
             }
             json_reader_end_member(reader); /* candidates */
@@ -1381,6 +1384,11 @@ static void got_sources(GList *sources, gpointer user_data)
             g_object_set(payload, "width", 1280, "height", 720, "framerate", 30.0, NULL);
             g_object_set(payload, "rtx-payload-type", 123, NULL);
             g_object_set_data(session, "encoding-name", g_strdup("VP8"));
+            g_object_set(session, "rtcp-mux", FALSE, NULL);
+            g_object_set_data(session, "payload-type", GUINT_TO_POINTER(103));
+            g_object_set_data(session, "clock-rate", GUINT_TO_POINTER(9000));
+            g_object_set_data(session, "ccm-fir", GUINT_TO_POINTER(TRUE));
+            g_object_set_data(session, "nack-pli", GUINT_TO_POINTER(FALSE));
 
             owr_media_session_set_send_payload(media_session, payload);
 
